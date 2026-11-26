@@ -16,6 +16,29 @@ export const PLANE = Object.freeze({
   }),
 });
 
+export const MIN_GRID_SIZE = 12;
+export const MAX_GRID_SIZE = 64;
+export const GRID_SIZE_STEP = 2;
+
+export function normalizeGridSize(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return PLANE.columns;
+  const bounded = Math.max(MIN_GRID_SIZE, Math.min(MAX_GRID_SIZE, Math.round(numeric)));
+  const stepped = Math.round((bounded - MIN_GRID_SIZE) / GRID_SIZE_STEP) * GRID_SIZE_STEP + MIN_GRID_SIZE;
+  return Math.max(MIN_GRID_SIZE, Math.min(MAX_GRID_SIZE, stepped));
+}
+
+export function createPlaneConfig(size = PLANE.columns) {
+  const gridSize = normalizeGridSize(size);
+  return {
+    ...PLANE,
+    columns: gridSize,
+    rows: gridSize,
+    width: gridSize * PLANE.tileWidth,
+    height: gridSize * PLANE.tileHeight,
+  };
+}
+
 export const MIN_ZOOM = 0.25;
 export const MAX_ZOOM = 4;
 export const DEFAULT_ZOOM = 1;

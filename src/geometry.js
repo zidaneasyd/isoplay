@@ -1,18 +1,23 @@
 import { PLANE } from "./config.js";
 import { getTileElevation, getTileElevationPixels } from "./elevation.js";
 
-const halfWidth = PLANE.tileWidth / 2;
-const halfHeight = PLANE.tileHeight / 2;
-
-/** True only for an integer row/column that belongs to the plane. */
-export function isTileInRange(row, column) {
-  return Number.isInteger(row) && Number.isInteger(column) &&
-    row >= 0 && row < PLANE.rows && column >= 0 && column < PLANE.columns;
+function resolvePlane(plane) {
+  return plane && Number.isFinite(plane.rows) && Number.isFinite(plane.columns) &&
+    Number.isFinite(plane.tileWidth) && Number.isFinite(plane.tileHeight) ? plane : PLANE;
 }
 
-export function tileCenter(row, column) {
-  if (!isTileInRange(row, column)) return null;
+/** True only for an integer row/column that belongs to the supplied plane. */
+export function isTileInRange(row, column, plane = PLANE) {
+  const config = resolvePlane(plane);
+  return Number.isInteger(row) && Number.isInteger(column) &&
+    row >= 0 && row < config.rows && column >= 0 && column < config.columns;
+}
 
+export function tileCenter(row, column, plane = PLANE) {
+  const config = resolvePlane(plane);
+  if (!isTileInRange(row, column, config)) return null;
+  const halfWidth = config.tileWidth / 2;
+  const halfHeight = config.tileHeight / 2;
   return {
     x: (column - row) * halfWidth,
     y: (column + row) * halfHeight + halfHeight,
@@ -20,30 +25,26 @@ export function tileCenter(row, column) {
 }
 
 /** Convert plane-local coordinates to a tile index. */
-export function hitTestTile(planeX, planeY) {
+export function hitTestTile(planeX, planeY, plane = PLANE) {
+  const config = resolvePlane(plane);
   if (!Number.isFinite(planeX) || !Number.isFinite(planeY)) return null;
 
-  // In isometric (column,row) coordinates, the original diamond distance
-  // |dx|/halfWidth + |dy|/halfHeight equals twice the Chebyshev distance.
-  // That bounds each candidate axis to a tiny interval (at most two values),
-  // avoiding a full scan of all 144 tiles on every pointer move.
+  const halfWidth = config.tileWidth / 2;
+  const halfHeight = config.tileHeight / 2;
   const normalizedX = planeX / halfWidth;
   const normalizedY = (planeY - halfHeight) / halfHeight;
   const columnCoordinate = (normalizedX + normalizedY) / 2;
   const rowCoordinate = (normalizedY - normalizedX) / 2;
   const tolerance = (1 + 1 / halfWidth) / 2;
-  // Candidate padding only protects interval rounding; final acceptance uses
-  // the legacy diamond-distance expression below to preserve edge semantics.
   const candidatePadding = 1e-7;
   const candidateTolerance = tolerance + candidatePadding;
 
   const firstRow = Math.max(0, Math.ceil(rowCoordinate - candidateTolerance));
-  const lastRow = Math.min(PLANE.rows - 1, Math.floor(rowCoordinate + candidateTolerance));
+  const lastRow = Math.min(config.rows - 1, Math.floor(rowCoordinate + candidateTolerance));
   const firstColumn = Math.max(0, Math.ceil(columnCoordinate - candidateTolerance));
-  const lastColumn = Math.min(PLANE.columns - 1, Math.floor(columnCoordinate + candidateTolerance));
+  const lastColumn = Math.min(config.columns - 1, Math.floor(columnCoordinate + candidateTolerance));
 
-  // Keep row-major ordering identical to the former exhaustive scan when
-  // adjacent tiles both accept a shared edge because of the small tolerance.
+  // Preserve the original row-major tie-break for shared edges/corners.
   for (let row = firstRow; row <= lastRow; row++) {
     for (let column = firstColumn; column <= lastColumn; column++) {
       const centerX = (column - row) * halfWidth;
@@ -68,17 +69,19 @@ function pointInPolygon(x, y, points) {
   return inside;
 }
 
-function tileSidePolygons(row, column, level, elevations) {
+function tileSidePolygons(row, column, level, elevations, plane) {
+  const halfWidth = plane.tileWidth / 2;
+  const halfHeight = plane.tileHeight / 2;
   const x = (column - row) * halfWidth;
   const y = (column + row) * halfHeight;
   const currentHeight = getTileElevationPixels(level);
   const west = { x: x - halfWidth, y: y + halfHeight };
   const east = { x: x + halfWidth, y: y + halfHeight };
-  const south = { x, y: y + PLANE.tileHeight };
-  const westNeighbor = row + 1 < PLANE.rows
-    ? getTileElevation(elevations, { row: row + 1, column }) : 0;
-  const eastNeighbor = column + 1 < PLANE.columns
-    ? getTileElevation(elevations, { row, column: column + 1 }) : 0;
+  const south = { x, y: y + plane.tileHeight };
+  const westNeighbor = row + 1 < plane.rows
+    ? getTileElevation(elevations, { row: row + 1, column }, plane) : 0;
+  const eastNeighbor = column + 1 < plane.columns
+    ? getTileElevation(elevations, { row, column: column + 1 }, plane) : 0;
   const polygons = [];
 
   if (level > westNeighbor) {
@@ -102,37 +105,37 @@ function tileSidePolygons(row, column, level, elevations) {
   return polygons;
 }
 
-/** Hit-test elevated top faces and their two visible side faces before the base plane. */
-export function hitTestTileAtElevations(planeX, planeY, elevations) {
+/** Hit-test elevated top faces and side faces before the base plane. */
+export function hitTestTileAtElevations(planeX, planeY, elevations, plane = PLANE) {
+  const config = resolvePlane(plane);
   if (!Number.isFinite(planeX) || !Number.isFinite(planeY)) return null;
-  if (!(elevations instanceof Map) || elevations.size === 0) return hitTestTile(planeX, planeY);
+  if (!(elevations instanceof Map) || elevations.size === 0) return hitTestTile(planeX, planeY, config);
 
-  // Reverse the render painter order so the visually front-most elevated tile wins.
-  for (let diagonal = PLANE.rows + PLANE.columns - 2; diagonal >= 0; diagonal--) {
-    for (let row = Math.min(PLANE.rows - 1, diagonal); row >= 0; row--) {
+  const halfWidth = config.tileWidth / 2;
+  const halfHeight = config.tileHeight / 2;
+  for (let diagonal = config.rows + config.columns - 2; diagonal >= 0; diagonal--) {
+    for (let row = Math.min(config.rows - 1, diagonal); row >= 0; row--) {
       const column = diagonal - row;
-      if (column < 0 || column >= PLANE.columns) continue;
+      if (column < 0 || column >= config.columns) continue;
       const tile = { row, column };
-      const level = getTileElevation(elevations, tile);
+      const level = getTileElevation(elevations, tile, config);
       if (level === 0) continue;
 
-      const center = tileCenter(row, column);
+      const center = tileCenter(row, column, config);
       const topY = center.y - getTileElevationPixels(level);
-      const distance = Math.abs(planeX - center.x) / halfWidth +
-        Math.abs(planeY - topY) / halfHeight;
+      const distance = Math.abs(planeX - center.x) / halfWidth + Math.abs(planeY - topY) / halfHeight;
       if (distance <= 1 + 1 / halfWidth) return tile;
 
-      for (const polygon of tileSidePolygons(row, column, level, elevations)) {
+      for (const polygon of tileSidePolygons(row, column, level, elevations, config)) {
         if (pointInPolygon(planeX, planeY, polygon)) return tile;
       }
     }
   }
-
-  return hitTestTile(planeX, planeY);
+  return hitTestTile(planeX, planeY, config);
 }
 
-export function toggleActiveTile(current, tile) {
-  if (!tile || !isTileInRange(tile.row, tile.column)) return current;
+export function toggleActiveTile(current, tile, plane = PLANE) {
+  if (!tile || !isTileInRange(tile.row, tile.column, plane)) return current;
   if (current?.row === tile.row && current?.column === tile.column) return null;
   return { row: tile.row, column: tile.column };
 }

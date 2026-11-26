@@ -1,20 +1,25 @@
-# Ringkasan Pengujian Tambahan
+# Pengujian Iso Playground
 
-Pengujian tambahan mengikuti modul yang benar-benar digunakan aplikasi, bukan API atau kontrol rancangan UI yang tidak didukung oleh proyek.
+## Pengujian otomatis
 
-## Cakupan otomatis
+Jalankan dari direktori proyek:
 
-- Hit-test seluruh tile, shared edge/corner, nilai invalid, dan pembandingan 80.000 titik pseudo-acak terhadap dua oracle.
-- Zoom anchor pada variasi viewport dan DPR, zoom minimum–maksimum, hover tetap di tile yang sama, wheel pixel/line/page, pan, resize, pointer capture, pembatalan drag, dan seleksi.
-- Inspector: format informasi seluruh 144 tile, pusat tile, status kosong/invalid, variasi nilai zoom/pan (termasuk nilai ekstrem dan non-finite), reset kamera, sinkronisasi seleksi dan state kamera.
-- Panel kanan: buka/tutup DAFTAR OBJEK dan TILE SELECTION secara independen; validasi `aria-expanded`, nama aksesibel, dan status layout lebar yang bertahan sampai panel terakhir ditutup.
-- Elevasi: variasi level 0–1024, input non-finite/negatif/desimal, penyimpanan independen tiap tile, tinggi maksimum canvas, top-face seluruh 144 tile pada 7 level, dua sisi terbuka, perbedaan tinggi antartetangga, dan render multi-tile.
-- Integrasi interaksi: klik memilih tile, kontrol `+`/`−` aktif setelah seleksi, level minimum 0, nilai elevasi dipertahankan saat berpindah seleksi, serta hit-test tetap tepat pada viewport dan DPR berbeda.
-- Server lokal: MIME type module, GET/HEAD, method yang ditolak, path tidak ditemukan, dan path traversal.
+```sh
+npm test
+```
 
-Jalankan seluruh pengujian otomatis dengan `npm test` (75 tes).
+Suite Node.js tidak membutuhkan dependensi eksternal. Cakupan mencakup:
 
-## Pengujian browser
+- Semua 144 tile default, pusat tile, hit-test, shared edges/corners, nilai invalid, serta oracle/property tests deterministik.
+- Elevasi per tile, level minimum 0, 1 level = 8 px, top face, sisi kiri/kanan, perbedaan elevasi tetangga dan canvas padding.
+- Inspector kiri, panel kanan expand/collapse, action rail, status aksesibilitas, dan sinkronisasi seleksi.
+- Ukuran grid dinamis 12–64 tile per sisi dengan langkah 2, dimensi plane, pembaruan metadata, pruning elevasi/seleksi saat grid diperkecil.
+- Toggle grid, axis, dan koordinat secara independen.
+- Zoom slider 25–400%, wheel zoom, anchor zoom, pan, reset kamera, viewport dan DPR.
+- Batas backing canvas agar grid besar pada zoom tinggi tidak mengalokasikan bitmap tanpa batas.
+- Server HTTP: MIME ES module, GET/HEAD, method yang ditolak, path hilang, dan perlindungan traversal.
+
+## Pengujian browser manual
 
 Jalankan server lokal:
 
@@ -22,6 +27,11 @@ Jalankan server lokal:
 npm run dev
 ```
 
-Buka `http://127.0.0.1:4173/checks/scenarios.html` di Chromium, Chrome, atau Firefox. Pengujian ini memuat aplikasi sebenarnya pada viewport 390×844, 800×600, 1280×720, dan 1920×1080. Cakupannya termasuk anchor zoom, hover, pan, resize, DPR, integrasi inspector, reset kamera, toggle panel, dan batas layout responsif.
+Buka `http://127.0.0.1:4173/`. Halaman pemeriksaan tersedia di:
 
-Browser perlu menjalankan ES module melalui HTTP; jangan membuka halaman aplikasi langsung sebagai `file://`. Pengujian browser headless tidak dapat dieksekusi pada lingkungan audit ini karena proses Chromium berhenti saat startup; cakupan interaksi dijalankan melalui harness Node dan server HTTP diuji terpisah.
+- `http://127.0.0.1:4173/checks/`
+- `http://127.0.0.1:4173/checks/scenarios.html`
+
+Skenario manual meliputi viewport 390×844, 800×600, 1280×720, dan 1920×1080, interaksi canvas, zoom/pan, resize, panel, Inspector, elevasi, serta layout responsif.
+
+Catatan: pada proses audit ini server dan respons HTTP diverifikasi. Chromium headless dicoba untuk mengambil DOM, tetapi proses browser tidak menyelesaikan startup/eksekusi dan tidak mengembalikan DOM. Maka pengujian visual interaktif browser belum dapat dinyatakan lulus.

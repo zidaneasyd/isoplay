@@ -1,8 +1,8 @@
 import { ELEVATION_STEP_PX, PLANE } from "./config.js";
 
-function isValidTile(tile) {
+function isValidTile(tile, plane = PLANE) {
   return tile && Number.isInteger(tile.row) && Number.isInteger(tile.column) &&
-    tile.row >= 0 && tile.row < PLANE.rows && tile.column >= 0 && tile.column < PLANE.columns;
+    tile.row >= 0 && tile.row < plane.rows && tile.column >= 0 && tile.column < plane.columns;
 }
 
 export function normalizeElevationLevel(level) {
@@ -14,13 +14,13 @@ export function elevationKey(row, column) {
   return `${row},${column}`;
 }
 
-export function getTileElevation(elevations, tile) {
-  if (!isValidTile(tile) || !(elevations instanceof Map)) return 0;
+export function getTileElevation(elevations, tile, plane = PLANE) {
+  if (!isValidTile(tile, plane) || !(elevations instanceof Map)) return 0;
   return normalizeElevationLevel(elevations.get(elevationKey(tile.row, tile.column)) ?? 0);
 }
 
-export function setTileElevation(elevations, tile, level) {
-  if (!(elevations instanceof Map) || !isValidTile(tile)) return 0;
+export function setTileElevation(elevations, tile, level, plane = PLANE) {
+  if (!(elevations instanceof Map) || !isValidTile(tile, plane)) return 0;
   const normalized = normalizeElevationLevel(level);
   const key = elevationKey(tile.row, tile.column);
   if (normalized === 0) elevations.delete(key);

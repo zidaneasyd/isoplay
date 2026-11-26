@@ -41,3 +41,14 @@ test("file protocol displays instructions to start the supported local HTTP serv
   assert.match(html, /npm run dev/);
   assert.match(html, /http:\/\/127\.0\.0\.1:4173/);
 });
+
+
+test("workspace Inspector exposes functional grid, axis, coordinate and zoom controls", () => {
+  assert.match(getElement("grid-size-slider"), /type="range"/);
+  assert.match(getElement("grid-size-slider"), /min="12".*max="64".*step="2"/);
+  assert.match(getElement("axis-toggle"), /type="checkbox"/);
+  assert.match(getElement("grid-toggle"), /type="checkbox"/);
+  assert.match(getElement("coord-toggle"), /type="checkbox"/);
+  assert.match(getElement("zoom-slider"), /min="25".*max="400"/);
+  assert.match(html, /id="plane-dimensions"/);
+});

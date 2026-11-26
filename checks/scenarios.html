@@ -246,12 +246,40 @@
       } finally { app.close(); }
     });
 
+    await check("workspace Inspector mengendalikan ukuran grid, layer visual, dan zoom", async () => {
+      const app = await openApp(1280, 720);
+      try {
+        const doc = app.win.document;
+        const grid = doc.querySelector("#grid-size-slider");
+        grid.value = "20";
+        grid.dispatchEvent(new app.win.Event("input", { bubbles: true }));
+        assert(doc.querySelector("#plane-size").textContent === "20 × 20 tile", "grid runtime tidak diperbarui");
+        assert(doc.querySelector("#plane-dimensions").textContent === "1280 × 640 px", "dimensi plane tidak ikut berubah");
+        assert(doc.querySelector("#plane-label").textContent === "Plane · 20 × 20 tile", "topbar tidak ikut tersinkron");
+
+        for (const id of ["#axis-toggle", "#grid-toggle", "#coord-toggle"]) {
+          const control = doc.querySelector(id);
+          control.checked = id === "#coord-toggle";
+          control.dispatchEvent(new app.win.Event("change", { bubbles: true }));
+          assert(control.checked === (id === "#coord-toggle"), `${id} tidak menerima status baru`);
+        }
+        const zoom = doc.querySelector("#zoom-slider");
+        zoom.value = "175";
+        zoom.dispatchEvent(new app.win.Event("input", { bubbles: true }));
+        assert(doc.querySelector("#camera-zoom").textContent === "175%", "zoom slider tidak mengubah kamera aktual");
+        doc.querySelector("#reset-camera").click();
+        assert(doc.querySelector("#camera-zoom").textContent === "100%", "reset kamera tidak mengembalikan nilai slider");
+        grid.value = "12";
+        grid.dispatchEvent(new app.win.Event("input", { bubbles: true }));
+      } finally { app.close(); }
+    });
+
     await check("layout inspector tidak melewati batas pada viewport desktop dan mobile", async () => {
       for (const [width, height] of [[390, 844], [800, 600], [1280, 720], [1920, 1080]]) {
         const app = await openApp(width, height);
         try {
           const panel = app.win.document.querySelector("#inspector-panel").getBoundingClientRect();
-          const selection = app.win.document.querySelector(".selection-panel").getBoundingClientRect();
+          const selection = app.win.document.querySelector("#selection-panel").getBoundingClientRect();
           assert(panel.left >= -1 && panel.right <= width + 1, `panel kiri meluap pada ${width}px`);
           assert(selection.left >= -1 && selection.right <= width + 1, `panel kanan meluap pada ${width}px`);
           assert(app.win.document.querySelector("#reset-camera").getBoundingClientRect().width > 0,
@@ -260,7 +288,7 @@
       }
     });
 
-    details.textContent = "Skenario mencakup 4 ukuran viewport, anchor zoom, 16 tile/viewport, kombinasi pan, zoom, resize, DPR, batas skala, integrasi inspector, reset kamera, dan layout responsif.";
+    details.textContent = "Skenario mencakup 4 ukuran viewport, anchor zoom, ukuran grid runtime, toggle axis/grid/koordinat, zoom slider, 16 tile/viewport, kombinasi pan, resize, DPR, integrasi inspector, reset kamera, dan layout responsif.";
   </script>
 </body>
 </html>

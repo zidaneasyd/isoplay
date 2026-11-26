@@ -2,6 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   PLANE,
+  createPlaneConfig,
+  normalizeGridSize,
   drawPlane,
   hitTestTile,
   initializePlane,
@@ -11,7 +13,7 @@ import {
 } from "../plane.js";
 
 function createContext() {
-  const calls = { fills: [], strokes: [], transforms: [], clears: [], beginPaths: 0 };
+  const calls = { fills: [], strokes: [], transforms: [], clears: [], fillTexts: [], beginPaths: 0 };
   const context = {
     calls,
     fillStyle: "",
@@ -19,7 +21,8 @@ function createContext() {
     lineWidth: 1,
     setTransform(...args) { calls.transforms.push(args); },
     clearRect(...args) { calls.clears.push(args); },
-    save() {}, restore() {}, translate() {}, beginPath() { calls.beginPaths++; }, moveTo() {}, lineTo() {}, closePath() {},
+    save() {}, restore() {}, translate() {}, rotate() {}, beginPath() { calls.beginPaths++; }, moveTo() {}, lineTo() {}, closePath() {},
+    fillText(...args) { calls.fillTexts.push(args); },
     fill() { calls.fills.push(this.fillStyle); },
     stroke() { calls.strokes.push({ color: this.strokeStyle, width: this.lineWidth }); },
   };
@@ -49,16 +52,17 @@ function makeHarness({ width = 1280, height = 800, devicePixelRatio = 2 } = {}) 
       const panX = Number(x);
       const panY = Number(y);
       const zoom = Number(z);
+      const canvasWidth = Number.parseFloat(board.style.width) || PLANE.width;
       const canvasHeight = Number.parseFloat(board.style.height) || PLANE.height;
       const origin = board.style.transformOrigin?.match(/([\d.]+)px\s+([\d.]+)px/);
-      const originX = origin ? Number(origin[1]) : PLANE.width / 2;
+      const originX = origin ? Number(origin[1]) : canvasWidth / 2;
       const originY = origin ? Number(origin[2]) : canvasHeight / 2;
       const centerX = window.innerWidth / 2 + panX;
       const centerY = window.innerHeight / 2 + panY;
       return {
         left: centerX - originX * zoom,
         top: centerY - originY * zoom,
-        width: PLANE.width * zoom,
+        width: canvasWidth * zoom,
         height: canvasHeight * zoom,
       };
     },
@@ -66,8 +70,9 @@ function makeHarness({ width = 1280, height = 800, devicePixelRatio = 2 } = {}) 
   const readout = { textContent: "" };
   const uiElements = new Map();
   const selectors = [
-    "#inspector-panel", "#inspector-toggle", "#reset-camera", "#plane-size", "#tile-size",
-    "#hover-value", "#selected-value", "#selection-summary", "#selection-hint", "#selected-index",
+    "#inspector-panel", "#inspector-toggle", "#reset-camera", "#plane-label", "#plane-size",
+    "#plane-dimensions", "#tile-size", "#grid-size-slider", "#grid-size-value",
+    "#axis-toggle", "#grid-toggle", "#coord-toggle", "#zoom-slider", "#hover-value", "#selected-value", "#selection-summary", "#selection-hint", "#selected-index",
     "#selected-detail-coord", "#selected-center", "#selected-elevation", "#selected-rise",
     "#elevation-decrease", "#elevation-increase", "#camera-zoom", "#camera-pan",
     "#camera-mode", "#footer-selection", "#footer-zoom", "#objects-panel", "#objects-expand",
@@ -79,6 +84,8 @@ function makeHarness({ width = 1280, height = 800, devicePixelRatio = 2 } = {}) 
     const classes = new Set();
     const element = {
       textContent: "",
+      value: "",
+      checked: false,
       attributes,
       disabled: false,
       title: "",
@@ -150,6 +157,127 @@ function wheelAt(harness, clientX, clientY, deltaY, deltaMode = 0) {
 function assertClose(actual, expected, message) {
   assert.ok(Math.abs(actual - expected) < 1e-7, `${message}: ${actual} !== ${expected}`);
 }
+
+test("Inspector grid-size control resizes the live plane and updates metadata", () => {
+  const h = makeHarness({ width: 1440, height: 900, devicePixelRatio: 1.5 });
+  try {
+    const slider = h.uiElements.get("#grid-size-slider");
+    slider.value = "20";
+    slider.dispatch("input", { target: slider });
+    const state = h.state.getState();
+    assert.deepEqual([state.plane.columns, state.plane.rows, state.plane.width, state.plane.height], [20, 20, 1280, 640]);
+    assert.equal(h.board.style.width, "1280px");
+    assert.equal(h.board.style.height, "640px");
+    assert.equal(h.canvas.width, 1280 * 1.5);
+    assert.equal(h.uiElements.get("#plane-size").textContent, "20 × 20 tile");
+    assert.equal(h.uiElements.get("#plane-dimensions").textContent, "1280 × 640 px");
+    assert.equal(h.uiElements.get("#plane-label").textContent, "Plane · 20 × 20 tile");
+    assert.equal(h.uiElements.get("#grid-size-value").textContent, "20 × 20");
+    assert.deepEqual(tileCenter(19, 19, state.plane), { x: 0, y: 624 });
+  } finally { h.restore(); }
+});
+
+test("shrinking grid removes out-of-range elevation and selection state", () => {
+  const h = makeHarness();
+  try {
+    const slider = h.uiElements.get("#grid-size-slider");
+    slider.value = "20";
+    slider.dispatch("input", { target: slider });
+    let rect = h.canvas.getBoundingClientRect();
+    const target = { row: 18, column: 18 };
+    const center = tileCenter(target.row, target.column, h.state.getState().plane);
+    const pointer = { clientX: rect.left + rect.width / 2 + center.x, clientY: rect.top + center.y };
+    h.dispatch("pointermove", pointer);
+    h.dispatch("click", { ...pointer, button: 0 });
+    h.uiElements.get("#elevation-increase").dispatch("click");
+    assert.equal(h.state.getState().activeElevation, 1);
+    slider.value = "12";
+    slider.dispatch("input", { target: slider });
+    const state = h.state.getState();
+    assert.equal(state.activeTile, null);
+    assert.equal(state.elevations.size, 0);
+    assert.equal(state.topPadding, 0);
+    assert.equal(state.plane.columns, 12);
+  } finally { h.restore(); }
+});
+
+test("maximum grid and zoom stay within safe canvas backing-store limits", () => {
+  const h = makeHarness({ width: 1600, height: 1000, devicePixelRatio: 2 });
+  try {
+    const grid = h.uiElements.get("#grid-size-slider");
+    grid.value = "64";
+    grid.dispatch("input", { target: grid });
+    const zoom = h.uiElements.get("#zoom-slider");
+    zoom.value = "400";
+    zoom.dispatch("input", { target: zoom });
+    const state = h.state.getState();
+    assert.equal(state.zoom, 4);
+    assert.equal(state.plane.width, 4096);
+    assert.equal(state.plane.height, 2048);
+    assert.ok(h.canvas.width <= 8192);
+    assert.ok(h.canvas.height <= 8192);
+    assert.ok(h.canvas.width * h.canvas.height <= 32_010_000,
+      `backing store is bounded: ${h.canvas.width} × ${h.canvas.height}`);
+    assert.ok(state.renderRatio < 8, "render scale is reduced before allocating an excessive backing store");
+  } finally { h.restore(); }
+});
+
+test("visual Inspector toggles independently control grid, axes and coordinate labels", () => {
+  const h = makeHarness();
+  try {
+    const axis = h.uiElements.get("#axis-toggle");
+    axis.checked = false;
+    axis.dispatch("change", { target: axis });
+    assert.equal(h.state.getState().visual.showAxes, false);
+    const grid = h.uiElements.get("#grid-toggle");
+    grid.checked = false;
+    grid.dispatch("change", { target: grid });
+    assert.equal(h.state.getState().visual.showGrid, false);
+    const coordinates = h.uiElements.get("#coord-toggle");
+    coordinates.checked = true;
+    coordinates.dispatch("change", { target: coordinates });
+    assert.equal(h.state.getState().visual.showCoordinates, true);
+    assert.equal(axis.checked, false);
+    assert.equal(grid.checked, false);
+    assert.equal(coordinates.checked, true);
+  } finally { h.restore(); }
+});
+
+test("zoom slider changes the real camera and reset restores the default view", () => {
+  const h = makeHarness();
+  try {
+    const slider = h.uiElements.get("#zoom-slider");
+    slider.value = "250";
+    slider.dispatch("input", { target: slider });
+    assert.equal(h.state.getState().zoom, 2.5);
+    assert.equal(h.uiElements.get("#camera-zoom").textContent, "250%");
+    assert.equal(h.canvas.style.width, `${PLANE.width}px`);
+    h.uiElements.get("#reset-camera").dispatch("click");
+    assert.equal(h.state.getState().zoom, 1);
+    assert.deepEqual(h.state.getState().pan, { x: 0, y: 0 });
+    assert.equal(slider.value, "100");
+  } finally { h.restore(); }
+});
+
+test("grid-size normalization enforces the 12–64 range and step of two", () => {
+  assert.equal(normalizeGridSize(12), 12);
+  assert.equal(normalizeGridSize(13), 14);
+  assert.equal(normalizeGridSize(63), 64);
+  assert.equal(normalizeGridSize(100), 64);
+  assert.equal(normalizeGridSize(-20), 12);
+  assert.equal(normalizeGridSize(Number.NaN), 12);
+});
+
+test("renderer supports dynamic plane dimensions and independent grid/axis/coordinate layers", () => {
+  const context = createContext();
+  const plane = createPlaneConfig(16);
+  drawPlane(context, { plane, showGrid: false, showAxes: true, showCoordinates: true });
+  assert.deepEqual(context.calls.clears[0], [0, 0, 1024, 512]);
+  assert.equal(context.calls.strokes.length, 3, "axis layer draws two isometric axes and one vertical axis");
+  assert.equal(context.calls.fillTexts.length, 256, "coordinate layer labels each of the 16 × 16 tiles");
+  assert.equal(context.calls.strokes.some(({ color }) => color === plane.colors.grid), false,
+    "grid-off mode suppresses ground grid and perimeter strokes");
+});
 
 test("plane has the expected dimensions, grid and palette", () => {
   assert.deepEqual(
