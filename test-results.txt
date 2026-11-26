@@ -1,0 +1,464 @@
+
+> isoplay@1.0.0 test
+> node --test
+
+TAP version 13
+# Subtest: elevation levels are normalized to finite non-negative whole levels
+ok 1 - elevation levels are normalized to finite non-negative whole levels
+  ---
+  duration_ms: 0.933697
+  type: 'test'
+  ...
+# Subtest: one elevation level always equals exactly eight CSS pixels
+ok 2 - one elevation level always equals exactly eight CSS pixels
+  ---
+  duration_ms: 0.175214
+  type: 'test'
+  ...
+# Subtest: tile elevations are independent across every tested corner and interior tile
+ok 3 - tile elevations are independent across every tested corner and interior tile
+  ---
+  duration_ms: 0.19909
+  type: 'test'
+  ...
+# Subtest: invalid tile coordinates cannot write into the elevation map
+ok 4 - invalid tile coordinates cannot write into the elevation map
+  ---
+  duration_ms: 0.810361
+  type: 'test'
+  ...
+# Subtest: maximum level and required vertical padding track the tallest remaining tile
+ok 5 - maximum level and required vertical padding track the tallest remaining tile
+  ---
+  duration_ms: 0.24535
+  type: 'test'
+  ...
+# Subtest: all 144 tile top faces remain hittable at multiple elevation levels when visible
+ok 6 - all 144 tile top faces remain hittable at multiple elevation levels when visible
+  ---
+  duration_ms: 15.183768
+  type: 'test'
+  ...
+# Subtest: both exposed side faces of a raised tile can be selected
+ok 7 - both exposed side faces of a raised tile can be selected
+  ---
+  duration_ms: 0.427514
+  type: 'test'
+  ...
+# Subtest: side-face hit regions shorten to the height difference from elevated neighbors
+ok 8 - side-face hit regions shorten to the height difference from elevated neighbors
+  ---
+  duration_ms: 0.325109
+  type: 'test'
+  ...
+# Subtest: raised tile renderer paints a top face and two visible side faces
+ok 9 - raised tile renderer paints a top face and two visible side faces
+  ---
+  duration_ms: 1.206977
+  type: 'test'
+  ...
+# Subtest: multi-tile elevation patterns render independent side heights without losing the ground grid
+ok 10 - multi-tile elevation patterns render independent side heights without losing the ground grid
+  ---
+  duration_ms: 0.557971
+  type: 'test'
+  ...
+# Subtest: zero-elevation and empty maps retain the original flat plane rendering
+ok 11 - zero-elevation and empty maps retain the original flat plane rendering
+  ---
+  duration_ms: 0.367334
+  type: 'test'
+  ...
+# Subtest: all 144 tile centers are unique and resolve to their own tile
+ok 12 - all 144 tile centers are unique and resolve to their own tile
+  ---
+  duration_ms: 1.981774
+  type: 'test'
+  ...
+# Subtest: every tile remains hittable for a grid of points safely inside its diamond
+ok 13 - every tile remains hittable for a grid of points safely inside its diamond
+  ---
+  duration_ms: 3.060629
+  type: 'test'
+  ...
+# Subtest: hit testing matches an independent isometric-coordinate oracle for 40,000 seeded points
+ok 14 - hit testing matches an independent isometric-coordinate oracle for 40,000 seeded points
+  ---
+  duration_ms: 38.517972
+  type: 'test'
+  ...
+# Subtest: optimized hit testing stays identical to the previous exhaustive scan for 40,000 points
+ok 15 - optimized hit testing stays identical to the previous exhaustive scan for 40,000 points
+  ---
+  duration_ms: 36.083556
+  type: 'test'
+  ...
+# Subtest: shared edges, corners and tolerance boundary use deterministic tie-breaking
+ok 16 - shared edges, corners and tolerance boundary use deterministic tie-breaking
+  ---
+  duration_ms: 1.018253
+  type: 'test'
+  ...
+# Subtest: candidate interval endpoints remain exact at the tolerance boundary
+ok 17 - candidate interval endpoints remain exact at the tolerance boundary
+  ---
+  duration_ms: 12.313596
+  type: 'test'
+  ...
+# Subtest: hit testing rejects non-finite points and tile range checks reject malformed indices
+ok 18 - hit testing rejects non-finite points and tile range checks reject malformed indices
+  ---
+  duration_ms: 0.295245
+  type: 'test'
+  ...
+# Subtest: an invalid selected tile cannot enter active selection state
+ok 19 - an invalid selected tile cannot enter active selection state
+  ---
+  duration_ms: 0.170237
+  type: 'test'
+  ...
+# Subtest: plane has the expected dimensions, grid and palette
+ok 20 - plane has the expected dimensions, grid and palette
+  ---
+  duration_ms: 1.401721
+  type: 'test'
+  ...
+# Subtest: tile centers and hit testing map every one of 144 cells
+ok 21 - tile centers and hit testing map every one of 144 cells
+  ---
+  duration_ms: 0.631531
+  type: 'test'
+  ...
+# Subtest: geometry rejects out-of-range, non-finite and invalid coordinates
+ok 22 - geometry rejects out-of-range, non-finite and invalid coordinates
+  ---
+  duration_ms: 0.125439
+  type: 'test'
+  ...
+# Subtest: active tile can be selected, replaced, toggled off and kept on empty click
+ok 23 - active tile can be selected, replaced, toggled off and kept on empty click
+  ---
+  duration_ms: 0.115944
+  type: 'test'
+  ...
+# Subtest: renderer draws all base tiles and expected focus styles
+ok 24 - renderer draws all base tiles and expected focus styles
+  ---
+  duration_ms: 0.794316
+  type: 'test'
+  ...
+# Subtest: renderer keeps visual line width stable while zoom changes
+ok 25 - renderer keeps visual line width stable while zoom changes
+  ---
+  duration_ms: 0.63686
+  type: 'test'
+  ...
+# Subtest: initialization uses fixed layout dimensions and HiDPI backing resolution
+ok 26 - initialization uses fixed layout dimensions and HiDPI backing resolution
+  ---
+  duration_ms: 1.229521
+  type: 'test'
+  ...
+# Subtest: hover, click, active state and pointer-leave work in canvas coordinates
+ok 27 - hover, click, active state and pointer-leave work in canvas coordinates
+  ---
+  duration_ms: 1.236603
+  type: 'test'
+  ...
+# Subtest: right and middle clicks do not select a tile
+ok 28 - right and middle clicks do not select a tile
+  ---
+  duration_ms: 0.636358
+  type: 'test'
+  ...
+# Subtest: zoom keeps the exact screen anchor stable at center, edges and corners
+ok 29 - zoom keeps the exact screen anchor stable at center, edges and corners
+  ---
+  duration_ms: 1.91849
+  type: 'test'
+  ...
+# Subtest: parameter matrix preserves zoom anchor across viewport and DPR combinations
+ok 30 - parameter matrix preserves zoom anchor across viewport and DPR combinations
+  ---
+  duration_ms: 1.683075
+  type: 'test'
+  ...
+# Subtest: zoom preserves plane-local position while hover remains accurate
+ok 31 - zoom preserves plane-local position while hover remains accurate
+  ---
+  duration_ms: 0.367674
+  type: 'test'
+  ...
+# Subtest: wheel line and page modes zoom in consistent directions
+ok 32 - wheel line and page modes zoom in consistent directions
+  ---
+  duration_ms: 0.27866
+  type: 'test'
+  ...
+# Subtest: zoom clamps at both ends without moving the plane after the limit
+ok 33 - zoom clamps at both ends without moving the plane after the limit
+  ---
+  duration_ms: 0.303056
+  type: 'test'
+  ...
+# Subtest: middle-button pan tracks pointer delta and terminates on pointerup or cancel
+ok 34 - middle-button pan tracks pointer delta and terminates on pointerup or cancel
+  ---
+  duration_ms: 0.247222
+  type: 'test'
+  ...
+# Subtest: pointer capture loss also ends pan and clears grabbing cursor
+ok 35 - pointer capture loss also ends pan and clears grabbing cursor
+  ---
+  duration_ms: 0.173031
+  type: 'test'
+  ...
+# Subtest: resize redraws with updated device pixel ratio and retains interaction state
+ok 36 - resize redraws with updated device pixel ratio and retains interaction state
+  ---
+  duration_ms: 0.329336
+  type: 'test'
+  ...
+# Subtest: renderer batches grid drawing and ignores out-of-range hover/active highlights
+ok 37 - renderer batches grid drawing and ignores out-of-range hover/active highlights
+  ---
+  duration_ms: 0.18637
+  type: 'test'
+  ...
+# Subtest: wheel zoom keeps the same hovered tile under a stationary cursor across viewport and DPR scenarios
+ok 38 - wheel zoom keeps the same hovered tile under a stationary cursor across viewport and DPR scenarios
+  ---
+  duration_ms: 9.591776
+  type: 'test'
+  ...
+# Subtest: the tile grabbed by middle-button pan remains under the moving pointer
+ok 39 - the tile grabbed by middle-button pan remains under the moving pointer
+  ---
+  duration_ms: 0.585763
+  type: 'test'
+  ...
+# Subtest: pointerleave during a middle-button drag preserves hover until the drag ends
+ok 40 - pointerleave during a middle-button drag preserves hover until the drag ends
+  ---
+  duration_ms: 0.26575
+  type: 'test'
+  ...
+# Subtest: click without a preceding pointermove still selects the tile under the click
+ok 41 - click without a preceding pointermove still selects the tile under the click
+  ---
+  duration_ms: 0.247683
+  type: 'test'
+  ...
+# Subtest: equal line-mode and pixel-mode wheel travel produces the same camera zoom
+ok 42 - equal line-mode and pixel-mode wheel travel produces the same camera zoom
+  ---
+  duration_ms: 0.244889
+  type: 'test'
+  ...
+# Subtest: wheel input is cancelled and invalid pointer coordinates cannot corrupt camera state
+ok 43 - wheel input is cancelled and invalid pointer coordinates cannot corrupt camera state
+  ---
+  duration_ms: 0.176886
+  type: 'test'
+  ...
+# Subtest: pointer events from another pointer cannot move or end an active pan
+ok 44 - pointer events from another pointer cannot move or end an active pan
+  ---
+  duration_ms: 0.184177
+  type: 'test'
+  ...
+# Subtest: hover clears outside the plane, returns on re-entry, and an empty click keeps selection
+ok 45 - hover clears outside the plane, returns on re-entry, and an empty click keeps selection
+  ---
+  duration_ms: 0.323958
+  type: 'test'
+  ...
+# Subtest: workspace inspector mirrors hover, selection, pan and zoom through varied viewport/DPR cases
+ok 46 - workspace inspector mirrors hover, selection, pan and zoom through varied viewport/DPR cases
+  ---
+  duration_ms: 2.528078
+  type: 'test'
+  ...
+# Subtest: right object and tile-selection panels expand independently and keep the action rail synchronized
+ok 47 - right object and tile-selection panels expand independently and keep the action rail synchronized
+  ---
+  duration_ms: 0.213893
+  type: 'test'
+  ...
+# Subtest: elevation controls activate only after selecting a tile and enforce level zero
+ok 48 - elevation controls activate only after selecting a tile and enforce level zero
+  ---
+  duration_ms: 0.728177
+  type: 'test'
+  ...
+# Subtest: elevation is per-tile, retained across selection changes, and does not enable controls without a selection
+ok 49 - elevation is per-tile, retained across selection changes, and does not enable controls without a selection
+  ---
+  duration_ms: 1.187759
+  type: 'test'
+  ...
+# Subtest: elevated top faces remain selectable after canvas padding grows at varied zoom and viewport sizes
+ok 50 - elevated top faces remain selectable after canvas padding grows at varied zoom and viewport sizes
+  ---
+  duration_ms: 3.650769
+  type: 'test'
+  ...
+# Subtest: local server serves the app and JavaScript modules with browser-safe MIME types
+ok 51 - local server serves the app and JavaScript modules with browser-safe MIME types
+  ---
+  duration_ms: 43.121436
+  type: 'test'
+  ...
+# Subtest: local server supports HEAD and rejects unsupported HTTP methods
+ok 52 - local server supports HEAD and rejects unsupported HTTP methods
+  ---
+  duration_ms: 13.14652
+  type: 'test'
+  ...
+# Subtest: local server rejects missing paths and traversal outside the project root
+ok 53 - local server rejects missing paths and traversal outside the project root
+  ---
+  duration_ms: 6.177124
+  type: 'test'
+  ...
+# Subtest: both right-side expand controls point to their corresponding panels
+ok 54 - both right-side expand controls point to their corresponding panels
+  ---
+  duration_ms: 0.902489
+  type: 'test'
+  ...
+# Subtest: expanded right panels and action rail have explicit desktop and mobile layout rules
+ok 55 - expanded right panels and action rail have explicit desktop and mobile layout rules
+  ---
+  duration_ms: 0.233421
+  type: 'test'
+  ...
+# Subtest: tile-selection elevation controls start disabled and explain the selection requirement
+ok 56 - tile-selection elevation controls start disabled and explain the selection requirement
+  ---
+  duration_ms: 0.341634
+  type: 'test'
+  ...
+# Subtest: file protocol displays instructions to start the supported local HTTP server
+ok 57 - file protocol displays instructions to start the supported local HTTP server
+  ---
+  duration_ms: 0.223366
+  type: 'test'
+  ...
+# Subtest: inspector starts with project configuration and empty selection
+ok 58 - inspector starts with project configuration and empty selection
+  ---
+  duration_ms: 1.220698
+  type: 'test'
+  ...
+# Subtest: every tile coordinate and center is rendered consistently (12 × 12 matrix)
+ok 59 - every tile coordinate and center is rendered consistently (12 × 12 matrix)
+  ---
+  duration_ms: 2.168656
+  type: 'test'
+  ...
+# Subtest: camera fields remain finite and formatted across zoom and pan extremes
+ok 60 - camera fields remain finite and formatted across zoom and pan extremes
+  ---
+  duration_ms: 0.504951
+  type: 'test'
+  ...
+# Subtest: invalid selection and hover values are safely represented as empty
+ok 61 - invalid selection and hover values are safely represented as empty
+  ---
+  duration_ms: 0.185289
+  type: 'test'
+  ...
+# Subtest: inspector toggle updates its state and accessible label on repeated use
+ok 62 - inspector toggle updates its state and accessible label on repeated use
+  ---
+  duration_ms: 0.201413
+  type: 'test'
+  ...
+# Subtest: reset camera control invokes the real camera reset callback
+ok 63 - reset camera control invokes the real camera reset callback
+  ---
+  duration_ms: 0.157898
+  type: 'test'
+  ...
+# Subtest: format helpers reject bad inputs and preserve signed pan values
+ok 64 - format helpers reject bad inputs and preserve signed pan values
+  ---
+  duration_ms: 0.117788
+  type: 'test'
+  ...
+# Subtest: wheel zoom is monotonic for a matrix of starting zooms and wheel deltas
+ok 65 - wheel zoom is monotonic for a matrix of starting zooms and wheel deltas
+  ---
+  duration_ms: 1.672729
+  type: 'test'
+  ...
+# Subtest: equal pixel and line-mode wheel distances produce equal zoom
+ok 66 - equal pixel and line-mode wheel distances produce equal zoom
+  ---
+  duration_ms: 0.233061
+  type: 'test'
+  ...
+# Subtest: zooming in and then out by equal wheel travel is reversible away from limits
+ok 67 - zooming in and then out by equal wheel travel is reversible away from limits
+  ---
+  duration_ms: 0.189765
+  type: 'test'
+  ...
+# Subtest: pan focus invariance holds across zoom, pan and focus parameter combinations
+ok 68 - pan focus invariance holds across zoom, pan and focus parameter combinations
+  ---
+  duration_ms: 0.640585
+  type: 'test'
+  ...
+# Subtest: zoom focus extraction is stable across scaled rectangles and rejects bad coordinates
+ok 69 - zoom focus extraction is stable across scaled rectangles and rejects bad coordinates
+  ---
+  duration_ms: 1.459729
+  type: 'test'
+  ...
+# Subtest: wheel zoom follows direction and clamps at both zoom limits
+ok 70 - wheel zoom follows direction and clamps at both zoom limits
+  ---
+  duration_ms: 0.801618
+  type: 'test'
+  ...
+# Subtest: zoom inputs are sanitized instead of producing NaN or Infinity
+ok 71 - zoom inputs are sanitized instead of producing NaN or Infinity
+  ---
+  duration_ms: 0.41827
+  type: 'test'
+  ...
+# Subtest: wheel delta normalization supports pixel, line, page and missing values
+ok 72 - wheel delta normalization supports pixel, line, page and missing values
+  ---
+  duration_ms: 0.154202
+  type: 'test'
+  ...
+# Subtest: zoom pan preserves a selected focus point on screen
+ok 73 - zoom pan preserves a selected focus point on screen
+  ---
+  duration_ms: 0.173411
+  type: 'test'
+  ...
+# Subtest: zoom focus is measured from the transformed center, on both axes
+ok 74 - zoom focus is measured from the transformed center, on both axes
+  ---
+  duration_ms: 0.764371
+  type: 'test'
+  ...
+# Subtest: zoom pan does not mutate input and handles malformed pan safely
+ok 75 - zoom pan does not mutate input and handles malformed pan safely
+  ---
+  duration_ms: 0.754897
+  type: 'test'
+  ...
+1..75
+# tests 75
+# suites 0
+# pass 75
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 689.118506

@@ -49,13 +49,14 @@ function makeHarness({ width = 1280, height = 800, devicePixelRatio = 2 } = {}) 
       const panX = Number(x);
       const panY = Number(y);
       const zoom = Number(z);
+      const canvasHeight = Number.parseFloat(board.style.height) || PLANE.height;
       const centerX = window.innerWidth / 2 + panX;
       const centerY = window.innerHeight / 2 + panY;
       return {
         left: centerX - (PLANE.width * zoom) / 2,
-        top: centerY - (PLANE.height * zoom) / 2,
+        top: centerY - (canvasHeight * zoom) / 2,
         width: PLANE.width * zoom,
-        height: PLANE.height * zoom,
+        height: canvasHeight * zoom,
       };
     },
   };
@@ -63,9 +64,11 @@ function makeHarness({ width = 1280, height = 800, devicePixelRatio = 2 } = {}) 
   const uiElements = new Map();
   const selectors = [
     "#inspector-panel", "#inspector-toggle", "#reset-camera", "#plane-size", "#tile-size",
-    "#hover-value", "#selected-value", "#selection-summary", "#selected-index",
-    "#selected-detail-coord", "#selected-center", "#camera-zoom", "#camera-pan",
-    "#camera-mode", "#footer-selection", "#footer-zoom",
+    "#hover-value", "#selected-value", "#selection-summary", "#selection-hint", "#selected-index",
+    "#selected-detail-coord", "#selected-center", "#selected-elevation", "#selected-rise",
+    "#elevation-decrease", "#elevation-increase", "#camera-zoom", "#camera-pan",
+    "#camera-mode", "#footer-selection", "#footer-zoom", "#objects-panel", "#objects-expand",
+    "#selection-panel", "#selection-expand", "#object-count",
   ];
   for (const selector of selectors) {
     const handlers = new Map();
@@ -74,6 +77,17 @@ function makeHarness({ width = 1280, height = 800, devicePixelRatio = 2 } = {}) 
     const element = {
       textContent: "",
       attributes,
+      disabled: false,
+      title: "",
+      classList: {
+        toggle(name, force) {
+          if (force === true) { classes.add(name); return true; }
+          if (force === false) { classes.delete(name); return false; }
+          if (classes.has(name)) { classes.delete(name); return false; }
+          classes.add(name); return true;
+        },
+        contains(name) { return classes.has(name); },
+      },
       addEventListener(name, callback) {
         const callbacks = handlers.get(name) ?? [];
         callbacks.push(callback);
@@ -82,17 +96,23 @@ function makeHarness({ width = 1280, height = 800, devicePixelRatio = 2 } = {}) 
       dispatch(name, event = {}) { for (const callback of handlers.get(name) ?? []) callback(event); },
       setAttribute(name, value) { attributes[name] = value; },
     };
-    if (selector === "#inspector-panel") {
-      element.classList = { toggle(name) {
-        if (classes.has(name)) { classes.delete(name); return false; }
-        classes.add(name); return true;
-      } };
-    }
     uiElements.set(selector, element);
   }
   const previousDocument = globalThis.document;
   const previousWindow = globalThis.window;
-  globalThis.document = { querySelector: (selector) => selector === "#plane" ? canvas : selector === "#readout" ? readout : uiElements.get(selector) ?? null };
+  const bodyClasses = new Set();
+  globalThis.document = {
+    body: { classList: {
+      toggle(name, force) {
+        if (force === true) { bodyClasses.add(name); return true; }
+        if (force === false) { bodyClasses.delete(name); return false; }
+        if (bodyClasses.has(name)) { bodyClasses.delete(name); return false; }
+        bodyClasses.add(name); return true;
+      },
+      contains(name) { return bodyClasses.has(name); },
+    } },
+    querySelector: (selector) => selector === "#plane" ? canvas : selector === "#readout" ? readout : uiElements.get(selector) ?? null,
+  };
   globalThis.window = {
     devicePixelRatio,
     innerWidth: width,
@@ -105,7 +125,7 @@ function makeHarness({ width = 1280, height = 800, devicePixelRatio = 2 } = {}) 
   };
 
   return {
-    canvas, board, readout, context, uiElements,
+    canvas, board, readout, context, uiElements, bodyClasses,
     state: initializePlane(),
     dispatch(name, event = {}) {
       for (const listener of listeners.get(name) ?? []) listener(event);
@@ -676,6 +696,172 @@ test("workspace inspector mirrors hover, selection, pan and zoom through varied 
       assert.equal(h.uiElements.get("#camera-zoom").textContent, "100%");
       assert.equal(h.uiElements.get("#camera-pan").textContent, "+0, +0 px");
       assert.ok(h.state.getState().activeTile, "reset kamera tidak boleh menghapus tile terpilih");
+    } finally { h.restore(); }
+  }
+});
+
+test("right object and tile-selection panels expand independently and keep the action rail synchronized", () => {
+  const h = makeHarness();
+  try {
+    const objectsPanel = h.uiElements.get("#objects-panel");
+    const objectsExpand = h.uiElements.get("#objects-expand");
+    const selectionPanel = h.uiElements.get("#selection-panel");
+    const selectionExpand = h.uiElements.get("#selection-expand");
+
+    assert.equal(objectsExpand.attributes["aria-expanded"], "false");
+    assert.equal(selectionExpand.attributes["aria-expanded"], "false");
+    assert.equal(h.bodyClasses.has("right-wide"), false);
+
+    objectsExpand.dispatch("click");
+    assert.equal(objectsPanel.classList.contains("is-expanded"), true);
+    assert.equal(objectsExpand.classList.contains("is-expanded"), true);
+    assert.equal(objectsExpand.attributes["aria-expanded"], "true");
+    assert.equal(objectsExpand.attributes["aria-label"], "Perkecil panel daftar objek");
+    assert.equal(h.bodyClasses.has("right-wide"), true);
+
+    selectionExpand.dispatch("click");
+    assert.equal(selectionPanel.classList.contains("is-expanded"), true);
+    assert.equal(selectionExpand.attributes["aria-expanded"], "true");
+    assert.equal(h.bodyClasses.has("right-wide"), true);
+
+    objectsExpand.dispatch("click");
+    assert.equal(objectsPanel.classList.contains("is-expanded"), false);
+    assert.equal(h.bodyClasses.has("right-wide"), true,
+      "the action rail remains shifted while the other panel is expanded");
+
+    selectionExpand.dispatch("click");
+    assert.equal(selectionPanel.classList.contains("is-expanded"), false);
+    assert.equal(selectionExpand.attributes["aria-expanded"], "false");
+    assert.equal(selectionExpand.attributes["aria-label"], "Perluas panel tile selection");
+    assert.equal(h.bodyClasses.has("right-wide"), false,
+      "the action rail returns only after both panels are collapsed");
+  } finally { h.restore(); }
+});
+
+test("elevation controls activate only after selecting a tile and enforce level zero", () => {
+  const h = makeHarness();
+  try {
+    const decrease = h.uiElements.get("#elevation-decrease");
+    const increase = h.uiElements.get("#elevation-increase");
+    assert.equal(decrease.disabled, true);
+    assert.equal(increase.disabled, true);
+    assert.match(h.uiElements.get("#selection-hint").textContent, /Klik tile/);
+
+    const target = { row: 4, column: 5 };
+    const center = tileCenter(target.row, target.column);
+    const rect = h.canvas.getBoundingClientRect();
+    const pointer = {
+      clientX: rect.left + rect.width / 2 + center.x,
+      clientY: rect.top + center.y,
+      button: 0,
+    };
+    h.dispatch("click", pointer);
+    assert.deepEqual(h.state.getState().activeTile, target);
+    assert.equal(decrease.disabled, true, "decrease is disabled at the minimum level");
+    assert.equal(increase.disabled, false);
+    assert.match(h.uiElements.get("#selection-hint").textContent, /Gunakan/);
+
+    increase.dispatch("click");
+    assert.equal(h.state.getState().activeElevation, 1);
+    assert.equal(h.state.getState().topPadding, 8);
+    assert.equal(h.uiElements.get("#selected-elevation").textContent, "1");
+    assert.equal(h.uiElements.get("#selected-rise").textContent, "8 px");
+    assert.equal(h.uiElements.get("#selected-center").textContent, `${center.x}, ${center.y - 8} px`);
+    assert.equal(decrease.disabled, false);
+
+    decrease.dispatch("click");
+    assert.equal(h.state.getState().activeElevation, 0);
+    assert.equal(h.state.getState().topPadding, 0);
+    assert.equal(h.uiElements.get("#selected-rise").textContent, "0 px");
+    assert.equal(decrease.disabled, true);
+    assert.equal(increase.disabled, false);
+  } finally { h.restore(); }
+});
+
+test("elevation is per-tile, retained across selection changes, and does not enable controls without a selection", () => {
+  const h = makeHarness({ width: 1440, height: 900, devicePixelRatio: 2 });
+  try {
+    const increase = h.uiElements.get("#elevation-increase");
+    const decrease = h.uiElements.get("#elevation-decrease");
+    const clickTile = (row, column) => {
+      const state = h.state.getState();
+      const center = tileCenter(row, column);
+      const rect = h.canvas.getBoundingClientRect();
+      const level = state.elevations.get(`${row},${column}`) ?? 0;
+      h.dispatch("click", {
+        clientX: rect.left + rect.width / 2 + center.x * state.zoom,
+        clientY: rect.top + (state.topPadding + center.y - level * 8) * state.zoom,
+        button: 0,
+      });
+    };
+
+    clickTile(3, 7);
+    increase.dispatch("click");
+    increase.dispatch("click");
+    increase.dispatch("click");
+    assert.equal(h.state.getState().activeElevation, 3);
+    assert.equal(h.state.getState().topPadding, 24);
+
+    clickTile(8, 2);
+    assert.deepEqual(h.state.getState().activeTile, { row: 8, column: 2 });
+    assert.equal(h.state.getState().activeElevation, 0);
+    assert.equal(increase.disabled, false);
+    assert.equal(decrease.disabled, true);
+    increase.dispatch("click");
+    assert.equal(h.state.getState().activeElevation, 1);
+    assert.equal(h.state.getState().elevations.get("3,7"), 3);
+    assert.equal(h.state.getState().elevations.get("8,2"), 1);
+    assert.equal(h.state.getState().topPadding, 24,
+      "canvas padding follows the maximum elevation, not only the active tile");
+
+    clickTile(8, 2);
+    assert.equal(h.state.getState().activeTile, null);
+    assert.equal(increase.disabled, true);
+    assert.equal(decrease.disabled, true);
+  } finally { h.restore(); }
+});
+
+test("elevated top faces remain selectable after canvas padding grows at varied zoom and viewport sizes", () => {
+  const environments = [
+    { width: 390, height: 844, devicePixelRatio: 1 },
+    { width: 768, height: 900, devicePixelRatio: 1.25 },
+    { width: 1280, height: 720, devicePixelRatio: 1.5 },
+    { width: 1920, height: 1080, devicePixelRatio: 2 },
+  ];
+  const zoomDeltas = [-450, -150, 180, 600];
+  for (const environment of environments) {
+    const h = makeHarness(environment);
+    try {
+      const target = { row: 6, column: 4 };
+      const baseCenter = tileCenter(target.row, target.column);
+      let rect = h.canvas.getBoundingClientRect();
+      let pointer = {
+        clientX: rect.left + rect.width / 2 + baseCenter.x,
+        clientY: rect.top + baseCenter.y,
+        button: 0,
+      };
+      h.dispatch("click", pointer);
+      assert.deepEqual(h.state.getState().activeTile, target);
+      for (let level = 1; level <= 5; level++) {
+        h.uiElements.get("#elevation-increase").dispatch("click");
+        assert.equal(h.state.getState().activeElevation, level);
+        assert.equal(h.state.getState().topPadding, level * 8);
+        rect = h.canvas.getBoundingClientRect();
+        const state = h.state.getState();
+        pointer = {
+          clientX: rect.left + rect.width / 2 + baseCenter.x * state.zoom,
+          clientY: rect.top + (state.topPadding + baseCenter.y - level * 8) * state.zoom,
+        };
+        h.dispatch("pointermove", pointer);
+        assert.deepEqual(h.state.getState().hoveredTile, target,
+          `elevated tile remains under the pointer at ${environment.width}x${environment.height}, level ${level}`);
+      }
+      for (const deltaY of zoomDeltas) {
+        rect = h.canvas.getBoundingClientRect();
+        wheelAt(h, rect.left + rect.width * 0.61, rect.top + rect.height * 0.43, deltaY);
+        assert.ok(Number.isFinite(h.state.getState().zoom));
+        assert.ok(h.state.getState().zoom >= 0.25 && h.state.getState().zoom <= 4);
+      }
     } finally { h.restore(); }
   }
 });

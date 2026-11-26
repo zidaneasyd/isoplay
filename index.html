@@ -17,6 +17,8 @@
         --muted: #969696;
         --accent: #3478f6;
         --inspector-width: 264px;
+        --right-panel-width: 225px;
+        --right-panel-expanded-width: 450px;
       }
       * { box-sizing: border-box; }
       html, body { width: 100%; height: 100%; }
@@ -73,27 +75,10 @@
       .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
       .brand strong { color: #fff; font-size: 12px; font-weight: 600; letter-spacing: .25px; }
       .brand span { color: var(--muted); font-size: 10.5px; white-space: nowrap; }
-      .header-tools { display: flex; align-items: center; gap: 6px; }
-      .tool-button {
-        min-width: 30px;
-        height: 28px;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        gap: 7px;
-        padding: 0 8px;
-        border: 1px solid var(--border);
-        border-radius: 5px;
-        color: #dcdcdc;
-        background: rgb(28 28 28 / 82%);
-        cursor: pointer;
-      }
-      .tool-button:hover { color: #fff; background: rgb(255 255 255 / 9%); }
-      .tool-button:focus-visible, .panel-toggle:focus-visible, summary:focus-visible {
+      .panel-toggle:focus-visible, .right-expand:focus-visible, .quick-action:focus-visible, summary:focus-visible {
         outline: 2px solid #91baff;
         outline-offset: 2px;
       }
-      .tool-button svg { width: 15px; height: 15px; }
       .inspector-panel {
         position: fixed;
         z-index: 3;
@@ -188,21 +173,95 @@
       .inspector-panel.is-hidden + .panel-toggle { left: 0; }
       .panel-toggle svg { width: 16px; height: 16px; transition: transform 220ms ease; }
       .panel-toggle[aria-expanded="false"] svg { transform: rotate(180deg); }
-      .selection-panel {
+      .quick-actions {
         position: fixed;
-        z-index: 4;
-        top: 50px;
+        z-index: 16;
+        top: 46px;
+        right: calc(12px + var(--right-panel-width) + 12px);
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        transition: right 220ms cubic-bezier(.4, 0, .2, 1);
+      }
+      .quick-action {
+        width: 32px;
+        height: 32px;
+        display: grid;
+        place-items: center;
+        padding: 0;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        color: #dcdcdc;
+        background: rgb(28 28 28 / 92%);
+        cursor: pointer;
+      }
+      .quick-action:hover { color: #fff; background: rgb(45 45 45 / 96%); }
+      .quick-action svg { width: 16px; height: 16px; }
+      body.right-wide .quick-actions {
+        right: calc(12px + var(--right-panel-expanded-width) + 12px);
+      }
+      .right-panel {
+        position: fixed;
+        z-index: 15;
         right: 12px;
-        width: min(225px, calc(100vw - 24px));
+        width: var(--right-panel-width);
+        max-width: calc(100vw - 24px);
         display: flex;
         flex-direction: column;
         gap: 8px;
+        min-height: 0;
+        overflow: hidden;
         padding: 10px;
         border: 1px solid var(--border);
-        border-radius: 7px;
+        border-radius: 8px;
         background: rgb(28 28 28 / 90%);
         backdrop-filter: blur(12px);
+        transition: width 220ms cubic-bezier(.4, 0, .2, 1);
       }
+      .right-panel.upper { top: 48px; height: 260px; }
+      .right-panel.lower { top: 318px; bottom: 12px; }
+      .right-panel.is-expanded { width: var(--right-panel-expanded-width); }
+      .right-content {
+        display: flex;
+        flex: 1 1 auto;
+        flex-direction: column;
+        gap: 8px;
+        min-height: 0;
+        overflow: auto;
+      }
+      .object-empty {
+        display: flex;
+        flex: 1;
+        align-items: center;
+        justify-content: center;
+        color: #777;
+        text-align: center;
+      }
+      .right-expand {
+        position: fixed;
+        z-index: 17;
+        right: calc(12px + var(--right-panel-width));
+        width: 22px;
+        height: 30px;
+        display: grid;
+        place-items: center;
+        padding: 0;
+        border: 1px solid var(--border);
+        border-right: 0;
+        border-radius: 4px 0 0 4px;
+        color: #c2c2c2;
+        background: rgb(34 34 34 / 95%);
+        cursor: pointer;
+        transition: right 220ms cubic-bezier(.4, 0, .2, 1), background 150ms, color 150ms;
+      }
+      .right-expand:hover { color: #fff; background: #363636; }
+      .right-expand svg { width: 12px; height: 12px; transition: transform 220ms ease; }
+      .right-expand.is-expanded {
+        right: calc(12px + var(--right-panel-expanded-width));
+      }
+      .right-expand.is-expanded svg { transform: rotate(180deg); }
+      .right-expand.upper-toggle { top: 178px; }
+      .right-expand.lower-toggle { top: calc(50vh + 153px); }
       .right-title {
         display: flex;
         min-height: 22px;
@@ -217,6 +276,25 @@
       }
       .selection-summary { color: #d1d7df; font-size: 11px; }
       .selection-fields { display: grid; gap: 8px; }
+      .elevation-controls { display: inline-flex; align-items: center; gap: 7px; color: #d1d7df; }
+      .elevation-controls button {
+        width: 22px;
+        height: 22px;
+        display: grid;
+        place-items: center;
+        padding: 0;
+        border: 1px solid #3b4148;
+        border-radius: 4px;
+        color: #d7dfe8;
+        background: #24282d;
+        font-size: 14px;
+        line-height: 1;
+        cursor: pointer;
+      }
+      .elevation-controls button:hover:not(:disabled) { background: #30363d; }
+      .elevation-controls button:disabled { opacity: .38; cursor: not-allowed; }
+      .elevation-controls output { min-width: 14px; color: #d1d7df; font-variant-numeric: tabular-nums; text-align: center; }
+      .selection-note { color: #777; font-size: 10px; }
       .footer-bar {
         position: fixed;
         z-index: 5;
@@ -235,9 +313,22 @@
       .footer-meta { display: flex; flex-wrap: wrap; gap: 10px; }
       .footer-meta strong { color: #9ec5ff; font-weight: 500; }
       .readout { color: #aeb7c2; }
+      @media (min-width: 761px) and (max-width: 840px) {
+        :root {
+          --right-panel-expanded-width: min(450px, calc(100vw - var(--inspector-width) - 80px));
+        }
+      }
       @media (max-width: 760px) {
+        :root {
+          --right-panel-width: min(225px, calc(100vw - 46px));
+          --right-panel-expanded-width: min(450px, calc(100vw - 46px));
+        }
         .brand span { display: none; }
-        .selection-panel { top: auto; right: 10px; bottom: 48px; width: min(225px, calc(100vw - 20px)); }
+        .quick-actions, body.right-wide .quick-actions { right: 12px; }
+        .right-panel.upper { top: 86px; height: 220px; }
+        .right-panel.lower { top: auto; bottom: 48px; height: min(46vh, 390px); }
+        .right-expand.upper-toggle { top: calc(86px + 110px - 15px); }
+        .right-expand.lower-toggle { top: auto; bottom: calc(48px + min(23vh, 195px) - 15px); }
         .footer-bar { right: 10px; bottom: 10px; left: 10px; }
         .footer-meta { max-width: calc(100% - 90px); gap: 5px 9px; }
       }
@@ -245,11 +336,27 @@
         .inspector-panel { width: min(248px, calc(100vw - 48px)); }
         .panel-toggle { left: min(248px, calc(100vw - 48px)); }
         .brand strong { font-size: 11px; }
-        .tool-button { width: 28px; padding: 0 6px; }
-        .tool-button span { display: none; }
       }
+      #runtime-warning {
+        position: fixed;
+        z-index: 100;
+        right: 12px;
+        bottom: 12px;
+        left: 12px;
+        max-width: 680px;
+        margin: auto;
+        padding: 12px 14px;
+        border: 1px solid #6a5835;
+        border-radius: 6px;
+        color: #f0dfbd;
+        background: #30281a;
+        box-shadow: 0 8px 30px rgb(0 0 0 / 35%);
+        font-size: 11px;
+      }
+      #runtime-warning code { color: #fff; }
       @media (prefers-reduced-motion: reduce) {
-        .inspector-panel, .panel-toggle, .panel-toggle svg, .section > summary::before { transition: none; }
+        .inspector-panel, .panel-toggle, .panel-toggle svg, .section > summary::before,
+        .quick-actions, .right-panel, .right-expand, .right-expand svg { transition: none; }
       }
     </style>
   </head>
@@ -259,15 +366,15 @@
         <strong>Iso Playground</strong>
         <span>Plane · 12 × 12 tile</span>
       </div>
-      <div class="header-tools">
-        <button class="tool-button" id="reset-camera" type="button" aria-label="Reset kamera" title="Reset kamera">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-            <path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5" />
-          </svg>
-          <span>Reset kamera</span>
-        </button>
-      </div>
     </header>
+
+    <div class="quick-actions" aria-label="Aksi cepat">
+      <button class="quick-action" id="reset-camera" type="button" aria-label="Reset kamera" title="Reset kamera">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5" />
+        </svg>
+      </button>
+    </div>
 
     <main aria-label="Workspace plane isometrik">
       <div class="board">
@@ -306,13 +413,43 @@
       <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m14.5 5-7 7 7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
     </button>
 
-    <aside class="selection-panel" aria-label="Detail tile terpilih">
-      <div class="right-title"><span>SELECTION</span><span id="selected-index">—</span></div>
-      <div class="selection-summary" id="selection-summary">Belum ada tile dipilih</div>
-      <div class="selection-fields">
-        <div class="inspector-row"><span>Koordinat grid</span><output id="selected-detail-coord">—</output></div>
-        <div class="inspector-row"><span>Pusat tile</span><output id="selected-center">—</output></div>
+    <aside class="right-panel upper" id="objects-panel" aria-label="Daftar objek">
+      <div class="right-title"><span>DAFTAR OBJEK</span><span id="object-count">0</span></div>
+      <div class="right-content">
+        <div class="object-empty" id="objects-empty">Belum ada objek</div>
       </div>
+    </aside>
+    <button class="right-expand upper-toggle" id="objects-expand" type="button" aria-label="Perluas panel daftar objek" aria-controls="objects-panel" aria-expanded="false" title="Perluas panel ke kiri">
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m15 18-6-6 6-6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" /></svg>
+    </button>
+
+    <aside class="right-panel lower" id="selection-panel" aria-label="Informasi tile selection">
+      <div class="right-title"><span>TILE SELECTION</span><span id="selected-index">—</span></div>
+      <div class="right-content">
+        <div class="selection-summary" id="selection-summary">Belum ada tile dipilih</div>
+        <div class="selection-note" id="selection-hint">Klik tile pada canvas untuk mengaktifkan kontrol elevasi</div>
+        <div class="selection-fields">
+          <div class="inspector-row"><span>Koordinat grid</span><output id="selected-detail-coord">—</output></div>
+          <div class="inspector-row"><span>Pusat tile</span><output id="selected-center">—</output></div>
+          <div class="inspector-row">
+            <span>Elevasi</span>
+            <div class="elevation-controls" aria-label="Kontrol elevasi tile terpilih">
+              <button id="elevation-decrease" type="button" aria-label="Kurangi elevasi" title="Turunkan satu level" disabled>−</button>
+              <output id="selected-elevation" aria-live="polite">0</output>
+              <button id="elevation-increase" type="button" aria-label="Tambah elevasi" title="Naikkan satu level" disabled>+</button>
+            </div>
+          </div>
+          <div class="inspector-row"><span>Ketinggian</span><output id="selected-rise">0 px</output></div>
+          <div class="selection-note">1 level = 8 px · level minimum 0</div>
+        </div>
+      </div>
+    </aside>
+    <button class="right-expand lower-toggle" id="selection-expand" type="button" aria-label="Perluas panel tile selection" aria-controls="selection-panel" aria-expanded="false" title="Perluas panel ke kiri">
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m15 18-6-6 6-6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" /></svg>
+    </button>
+
+    <aside id="runtime-warning" role="alert" hidden>
+      Interaksi aplikasi membutuhkan server lokal karena proyek memakai JavaScript modules. Jalankan <code>npm run dev</code>, lalu buka <code>http://127.0.0.1:4173</code>.
     </aside>
 
     <footer class="footer-bar">
@@ -324,6 +461,11 @@
       <output id="footer-zoom">Zoom: 100%</output>
     </footer>
 
+    <script>
+      if (location.protocol === "file:") {
+        document.querySelector("#runtime-warning").hidden = false;
+      }
+    </script>
     <script type="module">
       import { initializePlane } from "./plane.js";
       initializePlane();

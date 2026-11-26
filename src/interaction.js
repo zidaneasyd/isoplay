@@ -1,5 +1,6 @@
-import { DEFAULT_ZOOM, PLANE } from "./config.js";
-import { hitTestTile, toggleActiveTile } from "./geometry.js";
+import { DEFAULT_ZOOM, ELEVATION_STEP_PX, PLANE } from "./config.js";
+import { getMaximumElevationPixels, getTileElevation, setTileElevation } from "./elevation.js";
+import { hitTestTileAtElevations, toggleActiveTile } from "./geometry.js";
 import { drawPlane } from "./render.js";
 import { initializeInspector } from "./ui.js";
 import {
@@ -23,22 +24,31 @@ export function initializePlane() {
 
   let hoveredTile = null;
   let activeTile = null;
+  const elevations = new Map();
+  let topPadding = 0;
   let zoom = DEFAULT_ZOOM;
   let pan = { x: 0, y: 0 };
   let drag = null;
   let lastPointer = null;
   let inspector;
 
-  // The plane's layout box stays at its native dimensions. Zoom is a visual
-  // transform around its center, avoiding CSS grid re-centering on every wheel.
+  // The ground plane keeps its native width/height; vertical canvas padding
+  // grows with the highest tile so raised top faces are never clipped.
   function updateTransform() {
+    const canvasHeight = PLANE.height + topPadding;
     board.style.width = `${PLANE.width}px`;
-    board.style.height = `${PLANE.height}px`;
+    board.style.height = `${canvasHeight}px`;
+    board.style.marginTop = `${-canvasHeight / 2}px`;
+    board.style.marginLeft = `${-PLANE.width / 2}px`;
     canvas.style.width = `${PLANE.width}px`;
-    canvas.style.height = `${PLANE.height}px`;
+    canvas.style.height = `${canvasHeight}px`;
     board.style.transformOrigin = "center center";
     board.style.transform = `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`;
-    inspector?.render({ zoom, pan, hoveredTile, activeTile, dragging: Boolean(drag) });
+    inspector?.render({
+      zoom, pan, hoveredTile, activeTile, elevations,
+      activeElevation: getTileElevation(elevations, activeTile),
+      dragging: Boolean(drag),
+    });
   }
 
   function draw() {
@@ -46,14 +56,18 @@ export function initializePlane() {
       ? window.devicePixelRatio : 1;
     const renderRatio = deviceRatio * zoom;
     const width = Math.max(1, Math.round(PLANE.width * renderRatio));
-    const height = Math.max(1, Math.round(PLANE.height * renderRatio));
+    const height = Math.max(1, Math.round((PLANE.height + topPadding) * renderRatio));
     if (canvas.width !== width) canvas.width = width;
     if (canvas.height !== height) canvas.height = height;
-    drawPlane(context, { hoveredTile, activeTile }, renderRatio, zoom);
+    drawPlane(context, { hoveredTile, activeTile, elevations, topPadding }, renderRatio, zoom);
   }
 
   function updateReadout() {
-    inspector?.render({ zoom, pan, hoveredTile, activeTile, dragging: Boolean(drag) });
+    inspector?.render({
+      zoom, pan, hoveredTile, activeTile, elevations,
+      activeElevation: getTileElevation(elevations, activeTile),
+      dragging: Boolean(drag),
+    });
     if (!readout) return;
     if (hoveredTile) {
       readout.textContent = `Hover: Kolom ${hoveredTile.column + 1}, Baris ${hoveredTile.row + 1} [${hoveredTile.column}, ${hoveredTile.row}]`;
@@ -78,15 +92,32 @@ export function initializePlane() {
     }
   }
 
-  inspector = initializeInspector(document, { onResetCamera: resetCamera });
+  function changeActiveElevation(delta) {
+    if (!activeTile || !Number.isFinite(delta)) return;
+    const currentLevel = getTileElevation(elevations, activeTile);
+    const nextLevel = Math.max(0, currentLevel + Math.trunc(delta));
+    if (nextLevel === currentLevel) return;
+
+    setTileElevation(elevations, activeTile, nextLevel);
+    topPadding = getMaximumElevationPixels(elevations);
+    updateTransform();
+    draw();
+    if (lastPointer) updateHover(lastPointer);
+    updateReadout();
+  }
+
+  inspector = initializeInspector(document, {
+    onResetCamera: resetCamera,
+    onElevationChange: changeActiveElevation,
+  });
 
   function updateHover(event) {
     if (!event || !Number.isFinite(event.clientX) || !Number.isFinite(event.clientY)) return;
     const rect = canvas.getBoundingClientRect();
     if (!rect.width || !rect.height) return;
     const planeX = (event.clientX - rect.left) / zoom - PLANE.width / 2;
-    const planeY = (event.clientY - rect.top) / zoom;
-    const nextTile = hitTestTile(planeX, planeY);
+    const planeY = (event.clientY - rect.top) / zoom - topPadding;
+    const nextTile = hitTestTileAtElevations(planeX, planeY, elevations);
     if (!sameTile(hoveredTile, nextTile)) {
       hoveredTile = nextTile;
       updateReadout();
@@ -112,7 +143,11 @@ export function initializePlane() {
     if (!drag || (event?.pointerId !== undefined && drag.pointerId !== event.pointerId)) return;
     drag = null;
     canvas.style.cursor = "";
-    inspector?.render({ zoom, pan, hoveredTile, activeTile, dragging: false });
+    inspector?.render({
+      zoom, pan, hoveredTile, activeTile, elevations,
+      activeElevation: getTileElevation(elevations, activeTile),
+      dragging: false,
+    });
   }
 
   canvas.addEventListener("pointermove", handlePointerMove);
@@ -120,7 +155,11 @@ export function initializePlane() {
     if (event.button !== 1) return;
     event.preventDefault?.();
     drag = { pointerId: event.pointerId, x: event.clientX, y: event.clientY };
-    inspector?.render({ zoom, pan, hoveredTile, activeTile, dragging: true });
+    inspector?.render({
+      zoom, pan, hoveredTile, activeTile, elevations,
+      activeElevation: getTileElevation(elevations, activeTile),
+      dragging: true,
+    });
     try { canvas.setPointerCapture?.(event.pointerId); } catch { /* optional in test/headless contexts */ }
     canvas.style.cursor = "grabbing";
   });
@@ -172,6 +211,16 @@ export function initializePlane() {
   draw();
 
   return {
-    getState: () => ({ zoom, pan: { ...pan }, hoveredTile, activeTile, dragging: Boolean(drag) }),
+    getState: () => ({
+      zoom,
+      pan: { ...pan },
+      hoveredTile,
+      activeTile,
+      elevations: new Map(elevations),
+      activeElevation: getTileElevation(elevations, activeTile),
+      topPadding,
+      elevationStepPx: ELEVATION_STEP_PX,
+      dragging: Boolean(drag),
+    }),
   };
 }

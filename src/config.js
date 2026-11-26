@@ -19,3 +19,4 @@ export const PLANE = Object.freeze({
 export const MIN_ZOOM = 0.25;
 export const MAX_ZOOM = 4;
 export const DEFAULT_ZOOM = 1;
+export const ELEVATION_STEP_PX = 8;
