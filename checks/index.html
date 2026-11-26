@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Pengecekan Plane Isometrik</title>
+    <style>
+      body { margin: 0; padding: 24px; color: #eee; background: #141414; font: 14px/1.5 system-ui, sans-serif; }
+      h1 { margin-top: 0; font-size: 22px; }
+      #summary { margin: 0 0 12px; font-weight: 700; }
+      #results { padding-left: 22px; }
+      .pass { color: #8ad49b; }
+      .fail { color: #ff8585; }
+      .fixture { margin-top: 24px; overflow: auto; }
+      #plane { display: block; width: 768px; height: 384px; }
+      #readout { display: block; margin: 8px 0; color: #bbb; }
+      #render-fixture { position: absolute; left: -10000px; top: 0; }
+    </style>
+  </head>
+  <body>
+    <h1>Pengecekan Plane Isometrik</h1>
+    <p id="summary">Menjalankan pengecekan...</p>
+    <ol id="results"></ol>
+
+    <section class="fixture" aria-label="Fixture integrasi plane">
+      <output id="readout">Arahkan kursor ke tile</output>
+      <canvas id="plane" aria-label="Fixture plane interaktif"></canvas>
+    </section>
+    <canvas id="render-fixture"></canvas>
+
+    <script type="module">
+      import {
+        PLANE,
+        drawPlane,
+        hitTestTile,
+        initializePlane,
+        tileCenter,
+        toggleActiveTile,
+      } from "../plane.js";
+
+      const results = document.querySelector("#results");
+      const summary = document.querySelector("#summary");
+      let passed = 0;
+      let failed = 0;
+
+      function check(name, callback) {
+        const item = document.createElement("li");
+        try {
+          callback();
+          item.textContent = `LULUS — ${name}`;
+          item.className = "pass";
+          passed++;
+        } catch (error) {
+          item.textContent = `GAGAL — ${name}: ${error.message}`;
+          item.className = "fail";
+          failed++;
+        }
+        results.append(item);
+      }
+
+      function assert(condition, message = "kondisi tidak terpenuhi") {
+        if (!condition) throw new Error(message);
+      }
+
+      function sameTile(actual, row, column) {
+        return actual?.row === row && actual?.column === column;
+      }
+
+      function colorAt(context, x, y) {
+        return [...context.getImageData(x, y, 1, 1).data].slice(0, 3);
+      }
+
+      function rgb(hex) {
+        return hex.match(/[a-f\d]{2}/gi).map((part) => parseInt(part, 16));
+      }
+
+      function hasColorNear(context, x, y, color, radius = 3) {
+        const target = rgb(color);
+        for (let py = y - radius; py <= y + radius; py++) {
+          for (let px = x - radius; px <= x + radius; px++) {
+            const actual = colorAt(context, px, py);
+            if (actual.every((channel, index) => channel === target[index])) return true;
+          }
+        }
+        return false;
+      }
+
+      check("ukuran plane dan tile", () => {
+        assert(PLANE.columns === 12 && PLANE.rows === 12);
+        assert(PLANE.tileWidth === 64 && PLANE.tileHeight === 32);
+        assert(PLANE.width === 768 && PLANE.height === 384);
+      });
+
+      check("pusat koordinat semua 144 tile terdeteksi tepat", () => {
+        for (let row = 0; row < PLANE.rows; row++) {
+          for (let column = 0; column < PLANE.columns; column++) {
+            const center = tileCenter(row, column);
+            assert(sameTile(hitTestTile(center.x, center.y), row, column), `baris ${row}, kolom ${column}`);
+          }
+        }
+      });
+
+      check("titik di luar plane tidak mengenai tile", () => {
+        assert(hitTestTile(1000, 1000) === null);
+        assert(hitTestTile(-500, -500) === null);
+      });
+
+      check("koordinat tile di luar rentang ditolak", () => {
+        assert(tileCenter(-1, 0) === null && tileCenter(0, 12) === null);
+      });
+
+      check("pemilihan tile menyimpan koordinat", () => {
+        const selected = toggleActiveTile(null, { row: 3, column: 5 });
+        assert(sameTile(selected, 3, 5));
+      });
+
+      check("tile aktif bisa diganti dan dinonaktifkan", () => {
+        const first = { row: 3, column: 5 };
+        const second = { row: 4, column: 6 };
+        assert(sameTile(toggleActiveTile(first, second), 4, 6));
+        assert(toggleActiveTile(first, first) === null);
+        assert(toggleActiveTile(first, null) === first);
+      });
+
+      const renderCanvas = document.querySelector("#render-fixture");
+      renderCanvas.width = PLANE.width;
+      renderCanvas.height = PLANE.height;
+      const renderContext = renderCanvas.getContext("2d", { willReadFrequently: true });
+      const sampleTile = { row: 4, column: 4 };
+      const sampleCenter = tileCenter(sampleTile.row, sampleTile.column);
+      const sampleX = PLANE.width / 2 + sampleCenter.x;
+      const sampleY = sampleCenter.y;
+
+      check("render tile normal memakai warna plane", () => {
+        drawPlane(renderContext);
+        assert(colorAt(renderContext, sampleX, sampleY).join(",") === rgb(PLANE.colors.tile).join(","));
+      });
+
+      check("render hover memakai warna isi dan stroke hover", () => {
+        drawPlane(renderContext, { hoveredTile: sampleTile });
+        assert(colorAt(renderContext, sampleX, sampleY).join(",") === rgb(PLANE.colors.hover).join(","));
+        const edgeX = Math.round(PLANE.width / 2 + sampleCenter.x + 16);
+        const edgeY = Math.round(sampleCenter.y - 8);
+        assert(hasColorNear(renderContext, edgeX, edgeY, PLANE.colors.hoverStroke), "stroke hover tidak ditemukan");
+      });
+
+      check("render tile aktif memakai warna isi dan stroke aktif", () => {
+        drawPlane(renderContext, { activeTile: sampleTile });
+        assert(colorAt(renderContext, sampleX, sampleY).join(",") === rgb(PLANE.colors.active).join(","));
+        const edgeX = Math.round(PLANE.width / 2 + sampleCenter.x + 16);
+        const edgeY = Math.round(sampleCenter.y - 8);
+        assert(hasColorNear(renderContext, edgeX, edgeY, PLANE.colors.activeStroke), "stroke aktif tidak ditemukan");
+      });
+
+      check("integrasi hover, klik, koordinat, dan toggle aktif", () => {
+        initializePlane();
+        const canvas = document.querySelector("#plane");
+        const readout = document.querySelector("#readout");
+        const rect = canvas.getBoundingClientRect();
+        const target = { row: 2, column: 3 };
+        const center = tileCenter(target.row, target.column);
+        const clientX = rect.left + rect.width / 2 + center.x;
+        const clientY = rect.top + center.y;
+        canvas.dispatchEvent(new PointerEvent("pointermove", { clientX, clientY, bubbles: true }));
+        assert(readout.textContent.includes("Hover: Kolom 4, Baris 3"), "readout hover tidak tepat");
+        canvas.dispatchEvent(new MouseEvent("click", { clientX, clientY, bubbles: true }));
+        assert(readout.textContent.includes("Hover: Kolom 4, Baris 3"), "tile tidak terpilih");
+        canvas.dispatchEvent(new PointerEvent("pointerleave"));
+        assert(readout.textContent.includes("Aktif: Kolom 4, Baris 3"), "koordinat aktif tidak bertahan saat pointer leave");
+        canvas.dispatchEvent(new PointerEvent("pointermove", { clientX, clientY, bubbles: true }));
+        canvas.dispatchEvent(new MouseEvent("click", { clientX, clientY, bubbles: true }));
+        canvas.dispatchEvent(new PointerEvent("pointerleave"));
+        assert(readout.textContent === "Arahkan kursor ke tile", "tile aktif tidak bisa dinonaktifkan");
+      });
+
+      summary.textContent = `${passed} lulus, ${failed} gagal`;
+      summary.className = failed ? "fail" : "pass";
+    </script>
+  </body>
+</html>

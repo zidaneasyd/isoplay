@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#141414" />
+    <title>Isometric Plane</title>
+    <style>
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        overflow: auto;
+        color: #e7edf4;
+        background: #141414;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+      }
+      main {
+        width: max(100vw, 768px);
+        height: max(100vh, 384px);
+        display: grid;
+        place-items: center;
+        position: relative;
+      }
+      .board { width: 768px; height: 384px; }
+      canvas { display: block; width: 768px; height: 384px; overflow: visible; }
+      .readout {
+        position: fixed;
+        left: 16px;
+        bottom: 16px;
+        padding: 8px 11px;
+        border: 1px solid #333;
+        border-radius: 6px;
+        color: #ddd;
+        background: #1c1c1c;
+        font: 12px/1.2 ui-monospace, SFMono-Regular, Consolas, monospace;
+        pointer-events: none;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="board">
+        <canvas id="plane" aria-label="Plane isometrik"></canvas>
+      </div>
+      <output class="readout" id="readout" aria-live="polite">Arahkan kursor ke tile</output>
+    </main>
+    <script type="module">
+      import { initializePlane } from "./plane.js";
+      initializePlane();
+    </script>
+  </body>
+</html>
