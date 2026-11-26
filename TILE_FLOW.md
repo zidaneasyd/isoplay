@@ -30,6 +30,12 @@ Input wheel dinormalisasi untuk mode pixel, line, dan page sehingga perangkat de
 
 Tekan dan tahan tombol tengah mouse, lalu gerakkan pointer untuk menggeser plane. Gerakan pan diukur dalam piksel layar sehingga konsisten pada seluruh level zoom. Drag berakhir saat `pointerup`, `pointercancel`, atau pointer capture hilang.
 
-## 8. Perubahan ukuran viewport
+## 8. Hit-test dan render
+
+Koordinat pointer diubah ke sumbu isometrik kolom/baris. Hit-test hanya memeriksa kandidat tile yang berada di sekitar koordinat itu, bukan memindai seluruh 144 tile. Urutan baris/kolom dipertahankan agar tile pada shared edge selalu diputuskan secara deterministik. Path isi tile dan grid dibatch untuk mengurangi jumlah pemanggilan canvas.
+
+Highlight/seleksi dengan indeks di luar grid diabaikan. Tile aktif yang valid tetap diprioritaskan jika posisi hover berada pada tile yang sama.
+
+## 9. Perubahan ukuran viewport
 
 Saat viewport berubah ukuran, board tetap dipusatkan oleh layout dan canvas dirender ulang mengikuti device-pixel-ratio terbaru. Status tile aktif dan posisi pan/zoom dipertahankan.

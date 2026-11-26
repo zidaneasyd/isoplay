@@ -11,7 +11,7 @@ import {
 } from "../plane.js";
 
 function createContext() {
-  const calls = { fills: [], strokes: [], transforms: [], clears: [] };
+  const calls = { fills: [], strokes: [], transforms: [], clears: [], beginPaths: 0 };
   const context = {
     calls,
     fillStyle: "",
@@ -19,7 +19,7 @@ function createContext() {
     lineWidth: 1,
     setTransform(...args) { calls.transforms.push(args); },
     clearRect(...args) { calls.clears.push(args); },
-    save() {}, restore() {}, translate() {}, beginPath() {}, moveTo() {}, lineTo() {}, closePath() {},
+    save() {}, restore() {}, translate() {}, beginPath() { calls.beginPaths++; }, moveTo() {}, lineTo() {}, closePath() {},
     fill() { calls.fills.push(this.fillStyle); },
     stroke() { calls.strokes.push({ color: this.strokeStyle, width: this.lineWidth }); },
   };
@@ -140,9 +140,9 @@ test("active tile can be selected, replaced, toggled off and kept on empty click
 test("renderer draws all base tiles and expected focus styles", () => {
   const context = createContext();
   drawPlane(context);
-  assert.equal(context.calls.fills.length, 144);
+  assert.equal(context.calls.fills.length, 1, "plain tiles are filled as one batched path");
   assert.ok(context.calls.fills.every((color) => color === PLANE.colors.tile));
-  assert.equal(context.calls.strokes.length, 145);
+  assert.equal(context.calls.strokes.length, 2, "grid and perimeter are each stroked once");
   assert.ok(context.calls.strokes.every(({ color, width }) => color === PLANE.colors.grid && width === 1));
 
   context.calls.fills.length = 0;
@@ -392,5 +392,200 @@ test("resize redraws with updated device pixel ratio and retains interaction sta
     assert.equal(h.canvas.width, PLANE.width * 2);
     assert.equal(h.canvas.height, PLANE.height * 2);
     assert.ok(h.state.getState().hoveredTile);
+  } finally { h.restore(); }
+});
+
+
+test("renderer batches grid drawing and ignores out-of-range hover/active highlights", () => {
+  const context = createContext();
+  drawPlane(context, {
+    hoveredTile: { row: 99, column: 99 },
+    activeTile: { row: -1, column: 2 },
+  });
+  assert.equal(context.calls.fills.length, 1, "invalid highlights must not add fill paths");
+  assert.deepEqual(context.calls.fills, [PLANE.colors.tile]);
+  assert.equal(context.calls.strokes.length, 2, "only the grid and perimeter should be drawn");
+
+  context.calls.fills.length = 0;
+  context.calls.strokes.length = 0;
+  drawPlane(context, {
+    hoveredTile: { row: 2, column: 3 },
+    activeTile: { row: 2, column: 3 },
+  });
+  assert.deepEqual(context.calls.fills, [PLANE.colors.tile, PLANE.colors.active],
+    "the active color takes precedence when hover and selection refer to the same tile");
+  assert.equal(context.calls.strokes.length, 3, "same tile must receive one active outline, not duplicate focus strokes");
+  assert.ok(context.calls.strokes.some(({ color }) => color === PLANE.colors.activeStroke));
+  assert.ok(!context.calls.strokes.some(({ color }) => color === PLANE.colors.hoverStroke));
+});
+
+test("wheel zoom keeps the same hovered tile under a stationary cursor across viewport and DPR scenarios", () => {
+  const scenarios = [
+    { width: 390, height: 844, devicePixelRatio: 1 },
+    { width: 800, height: 600, devicePixelRatio: 1.25 },
+    { width: 1280, height: 720, devicePixelRatio: 1.5 },
+    { width: 1920, height: 1080, devicePixelRatio: 2 },
+  ];
+  const tiles = [[5, 5], [6, 6], [4, 6], [7, 5]];
+  const deltas = [...Array(8).fill(-300), ...Array(16).fill(300), ...Array(4).fill(-300)];
+
+  for (const environment of scenarios) {
+    for (const [row, column] of tiles) {
+      const h = makeHarness(environment);
+      try {
+        const center = tileCenter(row, column);
+        const rect = h.canvas.getBoundingClientRect();
+        const pointer = {
+          clientX: rect.left + rect.width / 2 + center.x,
+          clientY: rect.top + center.y,
+        };
+        h.dispatch("pointermove", pointer);
+        const expected = { row, column };
+        assert.deepEqual(h.state.getState().hoveredTile, expected,
+          `initial hover at ${environment.width}x${environment.height}, tile ${row},${column}`);
+
+        for (const deltaY of deltas) {
+          wheelAt(h, pointer.clientX, pointer.clientY, deltaY);
+          assert.deepEqual(h.state.getState().hoveredTile, expected,
+            `tile ${row},${column} drifted at ${environment.width}x${environment.height}, zoom ${h.state.getState().zoom}`);
+        }
+      } finally { h.restore(); }
+    }
+  }
+});
+
+test("the tile grabbed by middle-button pan remains under the moving pointer", () => {
+  const h = makeHarness({ width: 1280, height: 720 });
+  try {
+    const center = tileCenter(5, 5);
+    const rect = h.canvas.getBoundingClientRect();
+    const pointer = {
+      clientX: rect.left + rect.width / 2 + center.x,
+      clientY: rect.top + center.y,
+    };
+    h.dispatch("pointermove", pointer);
+    assert.deepEqual(h.state.getState().hoveredTile, { row: 5, column: 5 });
+    h.dispatch("pointerdown", { button: 1, pointerId: 44, ...pointer, preventDefault() {} });
+    for (const [dx, dy] of [[-32, -16], [-100, 40], [250, -180], [-5, 5]]) {
+      h.dispatch("pointermove", {
+        pointerId: 44,
+        clientX: pointer.clientX + dx,
+        clientY: pointer.clientY + dy,
+      });
+      assert.deepEqual(h.state.getState().hoveredTile, { row: 5, column: 5 }, `drag delta ${dx},${dy}`);
+    }
+    h.dispatch("pointerup", { pointerId: 44 });
+  } finally { h.restore(); }
+});
+
+test("pointerleave during a middle-button drag preserves hover until the drag ends", () => {
+  const h = makeHarness();
+  try {
+    const tile = tileCenter(4, 5);
+    const rect = h.canvas.getBoundingClientRect();
+    const pointer = { clientX: rect.left + rect.width / 2 + tile.x, clientY: rect.top + tile.y };
+    h.dispatch("pointermove", pointer);
+    h.dispatch("pointerdown", { button: 1, pointerId: 5, ...pointer, preventDefault() {} });
+    h.dispatch("pointerleave");
+    assert.deepEqual(h.state.getState().hoveredTile, { row: 4, column: 5 });
+    h.dispatch("pointerup", { pointerId: 5 });
+    h.dispatch("pointerleave");
+    assert.equal(h.state.getState().hoveredTile, null);
+  } finally { h.restore(); }
+});
+
+test("click without a preceding pointermove still selects the tile under the click", () => {
+  const h = makeHarness();
+  try {
+    const center = tileCenter(6, 4);
+    const rect = h.canvas.getBoundingClientRect();
+    const pointer = {
+      clientX: rect.left + rect.width / 2 + center.x,
+      clientY: rect.top + center.y,
+      button: 0,
+    };
+    h.dispatch("click", pointer);
+    assert.deepEqual(h.state.getState().activeTile, { row: 6, column: 4 });
+  } finally { h.restore(); }
+});
+
+test("equal line-mode and pixel-mode wheel travel produces the same camera zoom", () => {
+  const pixels = makeHarness();
+  const lines = makeHarness();
+  try {
+    const rect = pixels.canvas.getBoundingClientRect();
+    const pointer = { clientX: rect.left + rect.width / 2 + 30, clientY: rect.top + 180 };
+    wheelAt(pixels, pointer.clientX, pointer.clientY, -48, 0);
+    wheelAt(lines, pointer.clientX, pointer.clientY, -3, 1);
+    assertClose(lines.state.getState().zoom, pixels.state.getState().zoom, "line/pixel zoom equivalence");
+  } finally {
+    pixels.restore();
+    lines.restore();
+  }
+});
+
+test("wheel input is cancelled and invalid pointer coordinates cannot corrupt camera state", () => {
+  const h = makeHarness();
+  try {
+    let prevented = 0;
+    const before = h.state.getState();
+    h.dispatch("wheel", {
+      clientX: NaN, clientY: 200, deltaY: -400,
+      preventDefault() { prevented++; },
+    });
+    assert.equal(prevented, 1);
+    const after = h.state.getState();
+    assert.equal(after.zoom, before.zoom);
+    assert.deepEqual(after.pan, before.pan);
+    assert.ok(Number.isFinite(after.zoom));
+    assert.ok(Number.isFinite(after.pan.x) && Number.isFinite(after.pan.y));
+  } finally { h.restore(); }
+});
+
+test("pointer events from another pointer cannot move or end an active pan", () => {
+  const h = makeHarness();
+  try {
+    const rect = h.canvas.getBoundingClientRect();
+    h.dispatch("pointerdown", {
+      button: 1, pointerId: 31, clientX: rect.left + 100, clientY: rect.top + 100,
+      preventDefault() {},
+    });
+    h.dispatch("pointermove", { pointerId: 32, clientX: rect.left + 900, clientY: rect.top + 900 });
+    assert.deepEqual(h.state.getState().pan, { x: 0, y: 0 });
+    h.dispatch("pointerup", { pointerId: 32 });
+    assert.equal(h.state.getState().dragging, true);
+    h.dispatch("pointermove", { pointerId: 31, clientX: rect.left + 120, clientY: rect.top + 70 });
+    assert.deepEqual(h.state.getState().pan, { x: 20, y: -30 });
+    h.dispatch("pointerup", { pointerId: 31 });
+    assert.equal(h.state.getState().dragging, false);
+  } finally { h.restore(); }
+});
+
+test("hover clears outside the plane, returns on re-entry, and an empty click keeps selection", () => {
+  const h = makeHarness();
+  try {
+    const selectedCenter = tileCenter(3, 4);
+    let rect = h.canvas.getBoundingClientRect();
+    const selectedPointer = {
+      clientX: rect.left + rect.width / 2 + selectedCenter.x,
+      clientY: rect.top + selectedCenter.y,
+      button: 0,
+    };
+    h.dispatch("click", selectedPointer);
+    assert.deepEqual(h.state.getState().activeTile, { row: 3, column: 4 });
+
+    h.dispatch("pointermove", { clientX: rect.left - 500, clientY: rect.top - 500 });
+    assert.equal(h.state.getState().hoveredTile, null);
+    assert.deepEqual(h.state.getState().activeTile, { row: 3, column: 4 });
+    h.dispatch("click", { clientX: rect.left - 500, clientY: rect.top - 500, button: 0 });
+    assert.deepEqual(h.state.getState().activeTile, { row: 3, column: 4 });
+
+    rect = h.canvas.getBoundingClientRect();
+    const nextCenter = tileCenter(6, 6);
+    h.dispatch("pointermove", {
+      clientX: rect.left + rect.width / 2 + nextCenter.x,
+      clientY: rect.top + nextCenter.y,
+    });
+    assert.deepEqual(h.state.getState().hoveredTile, { row: 6, column: 6 });
   } finally { h.restore(); }
 });

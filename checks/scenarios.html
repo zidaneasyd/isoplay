@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Uji Skenario Browser — Isoplay</title>
+  <style>
+    :root { color-scheme: dark; font-family: Inter, system-ui, sans-serif; }
+    body { margin: 0; padding: 24px; background: #141414; color: #e9edf2; }
+    h1 { margin: 0 0 8px; font-size: 22px; }
+    p { color: #aeb6c0; }
+    #summary { margin: 18px 0 12px; font-weight: 700; }
+    #summary.pass, .pass { color: #8bd59d; }
+    #summary.fail, .fail { color: #ff9292; }
+    #results { padding-left: 22px; line-height: 1.7; }
+    #results li { padding: 2px 0; }
+    #details { color: #aeb6c0; font-size: 12px; }
+    iframe { position: absolute; left: -20000px; top: 0; border: 0; visibility: hidden; }
+  </style>
+</head>
+<body>
+  <h1>Uji Skenario Browser Isoplay</h1>
+  <p>Pengujian browser nyata terhadap <code>index.html</code>, termasuk ukuran viewport, zoom anchor, hover, pan, dan resize.</p>
+  <div id="summary">Menjalankan pengujian…</div>
+  <ol id="results"></ol>
+  <div id="details"></div>
+  <script type="module">
+    const results = document.querySelector("#results");
+    const summary = document.querySelector("#summary");
+    const details = document.querySelector("#details");
+    let passed = 0;
+    let failed = 0;
+
+    const sleep = (ms = 60) => new Promise((resolve) => setTimeout(resolve, ms));
+    const assert = (condition, message = "kondisi tidak terpenuhi") => {
+      if (!condition) throw new Error(message);
+    };
+    const near = (actual, expected, message) => {
+      assert(Math.abs(actual - expected) < 0.1, `${message}: ${actual} ≠ ${expected}`);
+    };
+
+    async function check(name, callback) {
+      const item = document.createElement("li");
+      try {
+        await callback();
+        item.textContent = `LULUS — ${name}`;
+        item.className = "pass";
+        passed++;
+      } catch (error) {
+        item.textContent = `GAGAL — ${name}: ${error.message}`;
+        item.className = "fail";
+        failed++;
+      }
+      results.append(item);
+      summary.textContent = `${passed} lulus, ${failed} gagal`;
+      summary.className = failed ? "fail" : "pass";
+    }
+
+    async function openApp(width, height) {
+      const frame = document.createElement("iframe");
+      frame.src = "../index.html";
+      frame.style.width = `${width}px`;
+      frame.style.height = `${height}px`;
+      const loaded = new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => reject(new Error("iframe timeout")), 5000);
+        frame.addEventListener("load", () => { clearTimeout(timeout); resolve(); }, { once: true });
+      });
+      document.body.append(frame);
+      await loaded;
+      await sleep(40);
+      const win = frame.contentWindow;
+      const doc = win.document;
+      const canvas = doc.querySelector("#plane");
+      const readout = doc.querySelector("#readout");
+      assert(canvas && readout, "elemen plane/readout tidak ditemukan");
+      return {
+        frame, win, canvas, readout,
+        get dpr() { return win.devicePixelRatio || 1; },
+        rect() { return canvas.getBoundingClientRect(); },
+        move(x, y) {
+          canvas.dispatchEvent(new win.PointerEvent("pointermove", {
+            clientX: x, clientY: y, pointerId: 1, bubbles: true,
+          }));
+        },
+        down(x, y, button = 1, pointerId = 1) {
+          canvas.dispatchEvent(new win.PointerEvent("pointerdown", {
+            clientX: x, clientY: y, button, pointerId, bubbles: true, cancelable: true,
+          }));
+        },
+        up(pointerId = 1) {
+          canvas.dispatchEvent(new win.PointerEvent("pointerup", { pointerId, bubbles: true }));
+        },
+        wheel(x, y, deltaY, deltaMode = 0) {
+          canvas.dispatchEvent(new win.WheelEvent("wheel", {
+            clientX: x, clientY: y, deltaY, deltaMode, bubbles: true, cancelable: true,
+          }));
+        },
+        close() { frame.remove(); },
+      };
+    }
+
+    const viewportCases = [[390, 844], [800, 600], [1280, 720], [1920, 1080]];
+    const zoomDeltas = [-400, -400, -400, -400, -400, -400, -400, -400,
+      400, 400, 400, 400, 400, 400, 400, 400, 400, 400, 400, 400, 400, 400];
+
+    for (const [width, height] of viewportCases) {
+      await check(`zoom anchor stabil pada viewport ${width}×${height}`, async () => {
+        const app = await openApp(width, height);
+        try {
+          const relPoints = [[0.2, 0.5], [0.5, 0.2], [0.8, 0.5], [0.5, 0.8], [0.5, 0.5]];
+          for (const [rx, ry] of relPoints) {
+            const rect = app.rect();
+            const x = width / 2 + (rx - 0.5) * Math.min(180, width * 0.45);
+            const y = height / 2 + (ry - 0.5) * Math.min(160, height * 0.3);
+            app.move(x, y);
+            assert(app.readout.textContent.startsWith("Hover:"), `titik awal ${x},${y} tidak mengenai tile`);
+            for (const delta of [-300, 220, -450, 180]) {
+              const before = app.rect();
+              const oldZoom = before.width / 768;
+              const focusX = (x - (before.left + before.width / 2)) / oldZoom;
+              const focusY = (y - (before.top + before.height / 2)) / oldZoom;
+              app.wheel(x, y, delta);
+              const after = app.rect();
+              const nextZoom = after.width / 768;
+              near(after.left + after.width / 2 + focusX * nextZoom, x, "anchor X");
+              near(after.top + after.height / 2 + focusY * nextZoom, y, "anchor Y");
+              assert(app.readout.textContent.startsWith("Hover:"), "tile di bawah pointer berubah saat zoom");
+            }
+          }
+        } finally { app.close(); }
+      });
+    }
+
+    await check("hover tile tetap sama sepanjang zoom minimum–maksimum pada beberapa viewport", async () => {
+      const targets = [[5, 5], [6, 6], [4, 6], [7, 5]];
+      for (const [width, height] of viewportCases) {
+        for (const [row, column] of targets) {
+          const app = await openApp(width, height);
+          try {
+            const rect = app.rect();
+            // Tile center in the initial plane coordinate system.
+            const x = rect.left + rect.width / 2 + (column - row) * 32;
+            const y = rect.top + (column + row + 1) * 16;
+            app.move(x, y);
+            const expected = app.readout.textContent;
+            assert(expected.startsWith("Hover:"), `tile ${row},${column} tidak ter-hover pada awal`);
+            for (const delta of zoomDeltas) {
+              app.wheel(x, y, delta);
+              assert(app.readout.textContent === expected,
+                `tile berubah di ${width}×${height}, tile ${row},${column}: ${app.readout.textContent} != ${expected}`);
+            }
+          } finally { app.close(); }
+        }
+      }
+    });
+
+    await check("ukuran CSS plane tetap 768×384 dan backing store mengikuti DPR × zoom", async () => {
+      const app = await openApp(1000, 700);
+      try {
+        assert(app.canvas.style.width === "768px" && app.canvas.style.height === "384px", "ukuran CSS awal salah");
+        const dpr = app.dpr;
+        for (const delta of [-400, -400, 300, 600]) app.wheel(500, 350, delta);
+        await sleep(40);
+        const zoom = app.rect().width / 768;
+        assert(app.canvas.style.width === "768px", "ukuran layout CSS berubah karena zoom");
+        assert(app.canvas.width === Math.round(768 * dpr * zoom), "backing width tidak mengikuti DPR × zoom");
+        assert(app.canvas.height === Math.round(384 * dpr * zoom), "backing height tidak mengikuti DPR × zoom");
+      } finally { app.close(); }
+    });
+
+    await check("plane tetap terpusat ketika viewport diubah pada zoom maksimum", async () => {
+      const app = await openApp(1000, 700);
+      try {
+        app.wheel(500, 350, -10000);
+        near(app.rect().width / 768, 4, "zoom maksimum");
+        app.frame.style.width = "700px";
+        app.frame.style.height = "500px";
+        await sleep(100);
+        const rect = app.rect();
+        near(rect.left + rect.width / 2, 350, "pusat X setelah resize");
+        near(rect.top + rect.height / 2, 250, "pusat Y setelah resize");
+      } finally { app.close(); }
+    });
+
+    await check("pan tombol tengah tetap sinkron dengan pointer dan zoom sesudah drag", async () => {
+      const app = await openApp(1280, 720);
+      try {
+        const rect = app.rect();
+        const x = rect.left + rect.width / 2;
+        const y = rect.top + rect.height / 2;
+        app.move(x, y);
+        const before = app.readout.textContent;
+        app.down(x, y, 1, 42);
+        app.move(x + 50, y - 25);
+        assert(app.readout.textContent === before, "tile di bawah pointer berubah saat drag");
+        app.wheel(x + 50, y - 25, -500);
+        assert(app.readout.textContent === before, "tile berubah saat zoom setelah drag");
+        app.up(42);
+      } finally { app.close(); }
+    });
+
+    details.textContent = "Skenario mencakup 4 ukuran viewport, 5 posisi anchor, 16 tile/viewport, serta kombinasi pan, zoom, resize, DPR, dan batas skala.";
+  </script>
+</body>
+</html>

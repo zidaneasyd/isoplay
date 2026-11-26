@@ -15,18 +15,33 @@ Buka `http://localhost:8000/`.
 ## Struktur modul
 
 - `src/config.js` — dimensi grid, palet warna, dan batas zoom.
-- `src/geometry.js` — pusat tile, hit-test diamond, dan pemilihan tile.
+- `src/geometry.js` — pusat tile, pemeriksaan indeks, dan hit-test isometrik berbatasan kandidat.
 - `src/zoom.js` — normalisasi wheel, clamp zoom, serta matematika anchor/pan.
-- `src/render.js` — seluruh operasi gambar canvas.
+- `src/render.js` — gambar canvas dengan path fill/grid yang dibatch.
 - `src/interaction.js` — pengendali event pointer, wheel, resize, dan readout.
 - `plane.js` — public entry point/barrel untuk menjaga kompatibilitas import lama.
-- `tests/` — skenario otomatis Node.js.
-- `checks/` — halaman integrasi untuk pemeriksaan langsung di browser.
+- `tests/` — pengujian otomatis Node.js dan skenario property-based deterministik.
+- `checks/` — halaman integrasi render dan pengujian browser lintas viewport.
 
-## Pengujian
+## Pengujian otomatis
 
 ```sh
 npm test
 ```
 
-Lihat `checks/README.md` untuk menjalankan pemeriksaan visual dan integrasi browser.
+Suite saat ini berisi **45 tes** tanpa dependensi tambahan. Di dalamnya ada 80.000 titik acak deterministik yang membandingkan hit-test baru dengan oracle koordinat isometrik dan algoritma exhaustive lama, serta matriks viewport/DPR, zoom anchor, hover sepanjang zoom minimum–maksimum, pan, resize, input wheel, pointer, dan validasi highlight.
+
+## Pengujian browser
+
+Jalankan server lokal:
+
+```sh
+python -m http.server 8000
+```
+
+Buka halaman berikut di browser:
+
+- `http://localhost:8000/checks/` — cek visual warna, stroke, dan interaksi dasar.
+- `http://localhost:8000/checks/scenarios.html` — uji browser nyata dengan iframe berukuran 390×844, 800×600, 1280×720, dan 1920×1080; termasuk anchor zoom, posisi hover, pan, resize, dan resolusi backing canvas.
+
+ES module perlu dilayani lewat HTTP; jangan membuka halaman langsung sebagai `file://`.
