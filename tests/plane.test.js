@@ -806,22 +806,24 @@ test("right object and tile-selection panels expand independently and keep the a
     assert.equal(selectionExpand.attributes["aria-expanded"], "false");
     assert.equal(h.bodyClasses.has("right-wide"), false);
 
+    selectionExpand.dispatch("click");
+    assert.equal(selectionPanel.classList.contains("is-expanded"), true);
+    assert.equal(selectionExpand.attributes["aria-expanded"], "true");
+    assert.equal(h.bodyClasses.has("right-wide"), false,
+      "expanding the lower panel does not move the upper action rail");
+
     objectsExpand.dispatch("click");
     assert.equal(objectsPanel.classList.contains("is-expanded"), true);
     assert.equal(objectsExpand.classList.contains("is-expanded"), true);
     assert.equal(objectsExpand.attributes["aria-expanded"], "true");
     assert.equal(objectsExpand.attributes["aria-label"], "Perkecil panel daftar objek");
-    assert.equal(h.bodyClasses.has("right-wide"), true);
-
-    selectionExpand.dispatch("click");
-    assert.equal(selectionPanel.classList.contains("is-expanded"), true);
-    assert.equal(selectionExpand.attributes["aria-expanded"], "true");
-    assert.equal(h.bodyClasses.has("right-wide"), true);
+    assert.equal(h.bodyClasses.has("right-wide"), true,
+      "the action rail follows the upper panel");
 
     objectsExpand.dispatch("click");
     assert.equal(objectsPanel.classList.contains("is-expanded"), false);
-    assert.equal(h.bodyClasses.has("right-wide"), true,
-      "the action rail remains shifted while the other panel is expanded");
+    assert.equal(h.bodyClasses.has("right-wide"), false,
+      "the lower panel does not keep the action rail shifted");
 
     selectionExpand.dispatch("click");
     assert.equal(selectionPanel.classList.contains("is-expanded"), false);

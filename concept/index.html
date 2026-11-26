@@ -1,0 +1,448 @@
+﻿<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#141414" />
+    <title>Iso Playground — UI Sandbox</title>
+    <style>
+      * { box-sizing: border-box; }
+      html, body { width: 100%; height: 100%; }
+      body { margin: 0; min-height: 100vh; overflow: hidden; color: #e7edf4; background: #141414; font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
+      .topbar { position: fixed; z-index: 3; inset: 0 0 auto; height: 36px; display: flex; align-items: center; justify-content: space-between; padding: 0 12px; background: rgb(28 28 28 / 95%); border-bottom: 1px solid rgb(255 255 255 / 12%); }
+      .topbar strong { color: #fff; font-size: 12px; font-weight: 600; letter-spacing: .4px; }
+      .topbar span { color: #969696; font-size: 10.5px; }
+      .panel { position: fixed; z-index: 2; inset: 36px auto 0 0; width: min(264px, calc(100vw - 32px)); background: rgb(28 28 28 / 94%); border-right: 1px solid rgb(255 255 255 / 12%); transition: transform 250ms cubic-bezier(.4,0,.2,1); }
+      .panel__header { height: 0; overflow: hidden; }
+      .panel__content { height: 100%; overflow-y: auto; padding: 12px 12px 20px; scrollbar-width: thin; scrollbar-color: rgb(255 255 255 / 22%) transparent; }
+      .world-label { min-height: 22px; display: flex; align-items: center; padding-left: 0; color: #888; font-size: 10px; font-weight: 600; letter-spacing: .04em; }
+      .section { border: 0; }
+      .panel__content { padding: 8px 10px 20px; }
+      .section > summary { min-height: 30px; display: flex; align-items: center; gap: 8px; margin: 0; padding: 0 2px; color: #c2c2c2; background: transparent; font-size: 10px; font-weight: 600; cursor: pointer; list-style: none; }
+      .section > summary::-webkit-details-marker, .subsection > summary::-webkit-details-marker { display: none; }
+      summary::before { content: "›"; width: 12px; color: #929ba5; font-size: 17px; line-height: 1; transform: rotate(0); transition: transform 140ms ease; }
+      details[open] > summary::before { transform: rotate(90deg); }
+      .section__body { display: flex; flex-direction: column; gap: 10px; padding: 4px 2px 12px 20px; }
+      .grid-label { display: flex; justify-content: space-between; align-items: center; gap: 12px; color: #9fa8b2; font-size: 11px; }
+      .grid-label output { color: #d1d7df; font-variant-numeric: tabular-nums; }
+      .grid-slider { display: block; flex: 0 0 auto; width: 100%; height: 3px; margin: 0; accent-color: #8aafd4; cursor: pointer; }
+      .tile-fields { display: flex; flex-direction: column; gap: 12px; }
+      .tile-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: 22px; color: #9fa8b2; font-size: 11px; }
+      .tile-row > span:first-child { flex: 1; }
+      .elevation-controls { display: flex; align-items: center; gap: 8px; color: #d1d7df; }
+      .elevation-controls button { width: 22px; height: 22px; padding: 0; border: 1px solid #3b4148; border-radius: 4px; color: #d7dfe8; background: #24282d; cursor: pointer; }
+      .elevation-controls button:hover { background: #30363d; }
+      .follow-toggle { appearance: none; width: 30px; height: 16px; margin: 0; border-radius: 999px; background: #41464d; position: relative; cursor: pointer; transition: background 140ms ease; }
+      .follow-toggle::after { content: ""; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: #d7dfe8; transition: transform 140ms ease; }
+      .follow-toggle:checked { background: #668bad; }
+      .follow-toggle:checked::after { transform: translateX(14px); }
+      .subsection { margin: 2px 0; }
+      .subsection > summary { min-height: 28px; display: flex; align-items: center; gap: 7px; color: #bfc7d0; font-size: 11px; cursor: pointer; list-style: none; }
+      .subsection > summary::before { content: "›"; width: 10px; color: #7d8792; font-size: 15px; transition: transform 140ms ease; }
+      .subsection[open] > summary::before { transform: rotate(90deg); }
+      .fields { display: grid; gap: 8px; padding: 5px 4px 8px 17px; }
+      .field { display: flex; justify-content: space-between; align-items: center; gap: 10px; color: #9fa8b2; font-size: 11px; }
+      .field span { color: #d1d7df; }
+      .field input[type="number"], .field select { width: 92px; height: 25px; padding: 0 7px; border: 1px solid #3b4148; border-radius: 4px; outline: 0; color: #e0e6ed; background: #24282d; font: inherit; }
+      .field input:focus, .field select:focus { border-color: #718eae; }
+      .field input[type="checkbox"] { width: 14px; height: 14px; accent-color: #8aafd4; }
+      .panel__toggle { position: fixed; top: 46px; left: min(264px, calc(100vw - 32px)); width: 22px; height: 30px; display: grid; place-items: center; padding: 0; border: 1px solid rgb(255 255 255 / 14%); border-left: 0; border-radius: 0 4px 4px 0; color: #c2c2c2; background: rgb(34 34 34 / 95%); cursor: pointer; transition: left 250ms cubic-bezier(.4,0,.2,1), background 150ms; }
+      .panel__toggle:hover { background: #292929; }
+      .panel__toggle:focus-visible { outline: 2px solid #91baff; outline-offset: 2px; }
+      .panel__toggle svg { width: 16px; height: 16px; transition: transform 220ms ease; }
+      .panel.is-hidden { transform: translateX(-100%); }
+      .panel.is-hidden .panel__toggle { left: 0; }
+      .panel.is-hidden .panel__toggle svg { transform: rotate(180deg); }
+      @media (prefers-reduced-motion: reduce) { .panel, .panel__toggle svg, summary::before { transition: none; } }
+      /* Layout follows Iso Playground: compact chrome and flex based inspector panels. */
+      body { font-size: 11px; user-select: none; }
+      .topbar { gap: 12px; }
+      .topbar .brand { display:flex; align-items:center; gap:14px; min-width:0; }
+      .topbar nav { display:flex; align-items:center; gap:2px; }
+      .topbar nav button { padding:4px 8px; border:0; border-radius:3px; color:#c2c2c2; background:transparent; font:inherit; cursor:pointer; }
+      .topbar nav button:hover, .tool-button:hover { background:rgba(255,255,255,.1); color:#fff; }
+      .topbar .header-tools { display:flex; align-items:center; gap:6px; }
+      .tool-button { width:30px; height:30px; display:grid; place-items:center; padding:6px; border:1px solid rgba(255,255,255,.14); border-radius:6px; color:#dcdcdc; background:rgba(28,28,28,.82); cursor:pointer; }
+      .tool-button svg { width:16px; height:16px; }
+      .panel__content { display:flex; flex-direction:column; gap:10px; }
+      .section { flex:0 0 auto; }
+      .section > summary { border-bottom:1px solid rgba(255,255,255,.08); }
+      .section__body { gap:9px; }
+      .quick-actions { position:fixed; z-index:16; top:46px; right:249px; display:flex; align-items:center; gap:6px; transition:right 220ms cubic-bezier(.4,0,.2,1); }
+      .quick-action { width:32px; height:32px; display:grid; place-items:center; padding:0; border:1px solid rgba(255,255,255,.14); border-radius:6px; color:#dcdcdc; background:rgba(28,28,28,.82); cursor:pointer; }
+      .quick-action:hover { background:rgba(45,45,45,.96); color:#fff; }
+      .quick-action:focus-visible, .right-expand:focus-visible { outline:2px solid #91baff; outline-offset:2px; }
+      .quick-action svg { width:16px; height:16px; }
+      .right-stack { display:contents; }
+      .right-panel { position:fixed; z-index:15; right:12px; width:225px; max-width:calc(100vw - 24px); display:flex; flex-direction:column; gap:8px; min-height:0; overflow:hidden; padding:10px; border:1px solid rgba(255,255,255,.12); border-radius:8px; background:rgba(28,28,28,.88); transition:width 220ms cubic-bezier(.4,0,.2,1); }
+      .right-panel.upper { top:48px; height:260px; }
+      .right-panel.lower { top:318px; bottom:12px; }
+      .right-panel.is-expanded { width:450px; }
+      .right-expand { position:fixed; z-index:17; right:237px; width:22px; height:30px; display:grid; place-items:center; padding:0; border:1px solid rgba(255,255,255,.14); border-right:0; border-radius:4px 0 0 4px; color:#c2c2c2; background:rgba(34,34,34,.95); cursor:pointer; transition:right 220ms cubic-bezier(.4,0,.2,1), background 150ms, color 150ms; }
+      .right-expand:hover { background:#363636; color:#fff; }
+      .right-expand svg { width:12px; height:12px; transition:transform 220ms ease; }
+      .right-expand.is-expanded { right:462px; }
+      .right-expand.is-expanded svg { transform:rotate(180deg); }
+      .right-expand.upper-toggle { top:178px; }
+      .right-expand.lower-toggle { top:calc(50vh + 153px); }
+      body.right-wide .quick-actions { right:474px; }
+      .right-title { display:flex; flex:0 0 auto; align-items:center; justify-content:space-between; min-height:22px; padding-bottom:5px; border-bottom:1px solid rgba(255,255,255,.08); color:#a4a4a4; font-size:10.5px; font-weight:600; letter-spacing:.7px; }
+      .right-content { display:flex; flex:1 1 auto; flex-direction:column; gap:8px; min-height:0; overflow:auto; }
+      .object-empty { display:flex; flex:1; align-items:center; justify-content:center; color:#777; }
+      .footer-bar { position:fixed; z-index:2; right:min(249px,calc(100vw - 16px)); bottom:10px; left:278px; display:flex; align-items:center; justify-content:space-between; gap:12px; color:rgba(255,255,255,.68); font-size:10.5px; text-shadow:0 1px 3px #000; pointer-events:none; }
+      .footer-bar > * { min-width:0; }
+      .footer-meta { display:flex; flex-wrap:wrap; gap:10px; }
+      .footer-meta strong { color:#9ec5ff; font-weight:500; }
+      .sandbox-stage { position:fixed; inset:36px 0 0; display:grid; place-items:center; overflow:hidden; background:radial-gradient(ellipse at center, #202020 0%, #171717 54%, #141414 100%); }
+      .plane-preview { display:block; width:min(768px, calc(100vw - 32px)); height:auto; aspect-ratio:768 / 464; overflow:visible; cursor:crosshair; touch-action:none; }
+      .sandbox-note { position:fixed; bottom:44px; left:50%; transform:translateX(-50%); padding:5px 9px; border:1px solid rgba(255,255,255,.1); border-radius:5px; color:#858585; background:rgba(24,24,24,.78); font-size:10px; white-space:nowrap; pointer-events:none; }
+      .camera-controls { position:fixed; z-index:2; bottom:74px; left:50%; display:flex; align-items:center; gap:5px; transform:translateX(-50%); }
+      .camera-controls button { width:26px; height:24px; border:1px solid rgba(255,255,255,.14); border-radius:4px; color:#d7dfe8; background:rgba(28,28,28,.9); cursor:pointer; }
+      .camera-controls output { min-width:42px; color:#b9c1ca; text-align:center; font-size:10px; font-variant-numeric:tabular-nums; }
+      .notice { position:fixed; z-index:30; top:48px; left:50%; transform:translate(-50%,-8px); padding:7px 11px; border:1px solid rgba(255,255,255,.14); border-radius:6px; color:#e7edf4; background:#25282c; opacity:0; pointer-events:none; transition:opacity 140ms, transform 140ms; }
+      .notice.is-visible { transform:translate(-50%,0); opacity:1; }
+      @media(max-width:760px) {
+        .topbar nav,.topbar>span,.topbar .header-tools { display:none; }
+        .quick-actions, body.right-wide .quick-actions { right:12px; }
+        .right-panel { width:min(225px,calc(100vw - 24px)); }
+        .right-panel.is-expanded { width:min(450px,calc(100vw - 24px)); }
+        .right-expand { right:calc(12px + min(225px,100vw - 24px)); }
+        .right-expand.is-expanded { right:calc(12px + min(450px,100vw - 24px)); }
+        .right-panel.lower { top:auto; bottom:48px; height:min(46vh,390px); }
+        .right-expand.lower-toggle { top:auto; bottom:calc(48px + min(23vh,195px) - 15px); }
+        .footer-bar { left:12px; right:12px; }
+      }
+      @media (prefers-reduced-motion: reduce) { .quick-actions, .right-panel, .right-expand, .right-expand svg { transition:none; } }
+      /* Match the main workspace geometry while keeping this page a mock. */
+      :root { color-scheme: dark; --border:rgb(255 255 255 / 12%); --border-soft:rgb(255 255 255 / 8%); --inspector-width:264px; --right-panel-width:225px; --right-panel-expanded-width:450px; }
+      body { font:11px/1.4 Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif; }
+      button { font:inherit; }
+      main { position:relative; display:grid; width:100vw; height:100vh; place-items:center; overflow:hidden; isolation:isolate; }
+      .board { position:absolute; top:50%; left:50%; width:768px; height:384px; margin:-192px 0 0 -384px; transform-origin:center; transition:transform 180ms ease; }
+      canvas { display:block; width:768px; height:384px; overflow:visible; cursor:crosshair; }
+      .topbar { height:38px; z-index:5; border-bottom-color:var(--border); background:rgb(28 28 28 / 95%); backdrop-filter:blur(12px); }
+      .brand { display:flex; align-items:center; gap:12px; min-width:0; }
+      .brand strong { letter-spacing:.25px; }
+      .brand span { white-space:nowrap; }
+      .inspector-panel { position:fixed; z-index:3; inset:38px auto 0 0; width:min(var(--inspector-width),calc(100vw - 32px)); border-right:1px solid var(--border); background:rgb(28 28 28 / 94%); backdrop-filter:blur(12px); transition:transform 220ms cubic-bezier(.4,0,.2,1); }
+      .inspector-panel.is-hidden { transform:translateX(-100%); }
+      .panel-content { display:flex; height:100%; flex-direction:column; gap:6px; overflow-y:auto; padding:10px 10px 20px; }
+      .section { flex:0 0 auto; border:0; }
+      .section > summary { min-height:28px; border-bottom:1px solid var(--border-soft); }
+      .section-body { display:flex; flex-direction:column; gap:6px; padding:7px 2px 8px 20px; }
+      .inspector-row { display:flex; min-height:20px; align-items:center; justify-content:space-between; gap:12px; color:#9fa8b2; font-size:11px; }
+      .inspector-row output { color:#d1d7df; font-size:11px; font-weight:500; font-variant-numeric:tabular-nums; text-align:right; }
+      .panel-toggle { position:fixed; z-index:5; top:48px; left:min(var(--inspector-width),calc(100vw - 32px)); width:22px; height:30px; display:grid; place-items:center; padding:0; border:1px solid var(--border); border-left:0; border-radius:0 4px 4px 0; color:#c2c2c2; background:rgb(34 34 34 / 95%); cursor:pointer; transition:left 220ms cubic-bezier(.4,0,.2,1),background 150ms; }
+      .panel-toggle:hover { background:#292929; }
+      .inspector-panel.is-hidden + .panel-toggle { left:0; }
+      .panel-toggle svg { width:16px; height:16px; transition:transform 220ms ease; }
+      .panel-toggle[aria-expanded="false"] svg { transform:rotate(180deg); }
+      .right-panel { background:rgb(28 28 28 / 90%); border-color:var(--border); backdrop-filter:blur(12px); }
+      .right-panel.upper { top:48px; height:260px; }
+      .right-panel.lower { top:318px; bottom:12px; }
+      .right-title { border-bottom-color:var(--border-soft); letter-spacing:.6px; }
+      .selection-summary { color:#d1d7df; font-size:11px; }
+      .selection-fields { display:grid; gap:8px; }
+      .elevation-controls { display:inline-flex; align-items:center; gap:7px; color:#d1d7df; }
+      .elevation-controls button { width:22px; height:22px; display:grid; place-items:center; padding:0; border:1px solid #3b4148; border-radius:4px; color:#d7dfe8; background:#24282d; font-size:14px; line-height:1; }
+      .elevation-controls button:disabled { opacity:.38; cursor:not-allowed; }
+      .selection-note { color:#777; font-size:10px; }
+      .toggle-row,.zoom-control,.grid-control { display:flex; flex-direction:column; gap:5px; color:#9fa8b2; font-size:11px; }
+      .toggle-row { min-height:24px; flex-direction:row; align-items:center; justify-content:space-between; }
+      .grid-control > span,.zoom-control > span { display:flex; align-items:center; justify-content:space-between; }
+      .grid-control output,.zoom-control output { color:#d1d7df; font-variant-numeric:tabular-nums; }
+      .grid-control input,.zoom-control input { width:100%; height:2px; margin:7px 0 5px; appearance:none; border-radius:2px; background:#4a4f56; accent-color:#8aafd4; cursor:pointer; }
+      .grid-control input::-webkit-slider-thumb,.zoom-control input::-webkit-slider-thumb { width:8px; height:8px; appearance:none; border:0; border-radius:50%; background:#a9c7e6; }
+      .grid-control input::-moz-range-thumb,.zoom-control input::-moz-range-thumb { width:8px; height:8px; border:0; border-radius:50%; background:#a9c7e6; }
+      .toggle-row .switch-input { position:relative; width:28px; height:16px; margin:0; appearance:none; border:0; border-radius:999px; background:#41464d; cursor:pointer; transition:background 140ms ease; }
+      .toggle-row .switch-input::after { content:""; position:absolute; top:2px; left:2px; width:12px; height:12px; border-radius:50%; background:#d7dfe8; transition:transform 140ms ease; }
+      .toggle-row .switch-input:checked { background:#2f80ed; }
+      .toggle-row .switch-input:checked::after { transform:translateX(12px); }
+      .footer-bar { z-index:5; }
+      .footer-meta strong { color:#9ec5ff; font-weight:500; }
+      .readout { color:#aeb7c2; }
+      @media (min-width:761px) and (max-width:840px) { :root { --right-panel-expanded-width:min(450px,calc(100vw - var(--inspector-width) - 80px)); } }
+      @media (max-width:760px) {
+        :root { --right-panel-width:min(225px,calc(100vw - 46px)); --right-panel-expanded-width:min(450px,calc(100vw - 46px)); }
+        .brand span { display:none; }
+        .inspector-panel { width:min(var(--inspector-width),calc(100vw - 48px)); }
+        .panel-toggle { left:min(var(--inspector-width),calc(100vw - 48px)); }
+        .right-panel.upper { top:86px; height:220px; }
+        .right-panel.lower { top:auto; bottom:48px; height:min(46vh,390px); }
+        .right-expand.upper-toggle { top:calc(86px + 110px - 15px); }
+        .right-expand.lower-toggle { top:auto; bottom:calc(48px + min(23vh,195px) - 15px); }
+        .footer-meta { max-width:calc(100% - 90px); gap:5px 9px; }
+      }
+      @media (max-width:420px) { .brand strong { font-size:11px; } }
+      @media (prefers-reduced-motion:reduce) { .inspector-panel,.panel-toggle,.panel-toggle svg,.section > summary::before { transition:none; } }
+    </style>
+  </head>
+  <body>
+    <header class="topbar"><div class="brand"><strong>Iso Playground</strong><span id="plane-label">Plane · 12 × 12 tile</span></div></header>
+    <div class="quick-actions" aria-label="Aksi cepat">
+      <button class="quick-action" id="reset-camera" type="button" aria-label="Reset kamera" title="Reset kamera" data-notice="Reset kamera hanya mockup."><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5"/></svg></button>
+    </div>
+    <main aria-label="Workspace plane isometrik mockup"><div class="board"><canvas id="mock-plane" width="768" height="384" aria-label="Plane isometrik mockup. Arahkan kursor untuk melihat tile."></canvas></div></main>
+    <div class="notice" id="notice" role="status" aria-live="polite"></div>
+    <aside class="inspector-panel" id="side-panel">
+      <div class="panel-content">
+        <div class="world-label">WORKSPACE</div>
+        <details class="section" open><summary>PLANE</summary><div class="section-body"><label class="grid-control" for="grid-slider"><span>Ukuran grid <output id="grid-value">12 × 12</output></span><input id="grid-slider" type="range" min="12" max="64" step="2" value="12" aria-label="Ukuran grid"></label><div class="inspector-row"><span>Ukuran plane</span><output id="plane-size">768 × 384 px</output></div><label class="toggle-row"><span>AXIS</span><input class="switch-input" id="axis-toggle" type="checkbox" aria-label="Tampilkan axis" checked></label><label class="toggle-row"><span>Grid</span><input class="switch-input" id="grid-toggle" type="checkbox" aria-label="Tampilkan grid" checked></label><label class="toggle-row"><span>Coord in plane</span><input class="switch-input" id="coord-toggle" type="checkbox" aria-label="Tampilkan koordinat pada plane"></label></div></details>
+        <details class="section" open><summary>TILE</summary><div class="section-body"><div class="inspector-row"><span>Elevasi</span><span class="elevation-controls"><button type="button" aria-label="Kurangi elevasi" data-notice="Kontrol elevasi hanya mockup.">−</button><output>0</output><button type="button" aria-label="Tambah elevasi" data-notice="Kontrol elevasi hanya mockup.">+</button></span></div></div></details>
+        <details class="section" open><summary>CAMERA</summary><div class="section-body"><label class="zoom-control" for="zoom-slider"><span>Zoom <output id="zoom-value">100%</output></span><input id="zoom-slider" type="range" min="50" max="200" step="5" value="100" aria-label="Zoom kamera"></label></div></details>
+      </div>
+    </aside>
+    <button class="panel-toggle" type="button" aria-label="Sembunyikan inspector" aria-controls="side-panel" aria-expanded="true">
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m14.5 5-7 7 7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
+    </button>
+    <div class="right-stack" aria-label="Inspector kanan">
+      <aside class="right-panel upper" id="objects-panel"><div class="right-title"><span>DAFTAR OBJEK</span><span>0</span></div><div class="right-content"><div class="object-empty">Belum ada objek</div></div></aside>
+      <aside class="right-panel lower" id="selection-panel"><div class="right-title"><span>INFORMASI TILE</span><span id="selection-index">—</span></div><div class="right-content"><div class="selection-summary" id="selection-summary">Belum ada tile diarahkan</div><div class="selection-note" id="selection-hint">Arahkan kursor ke plane untuk melihat informasi tile</div><div class="selection-fields"><div class="inspector-row"><span>Koordinat grid</span><output id="selection-coordinate">—</output></div><div class="inspector-row"><span>Pusat tile</span><output id="selection-center">—</output></div><div class="inspector-row"><span>Elevasi</span><output id="selection-elevation">0</output></div><div class="inspector-row"><span>Ketinggian</span><output id="selection-rise">0 px</output></div><div class="selection-note">1 level = 8 px · level minimum 0</div><div class="inspector-row"><span>Pan</span><output>+0, +0 px</output></div><div class="inspector-row"><span>Status kamera</span><output>Mockup</output></div></div></div></aside>
+    </div>
+    <button class="right-expand upper-toggle" type="button" aria-label="Perluas panel objek" aria-controls="objects-panel" aria-expanded="false" title="Perluas panel ke kiri"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m15 18-6-6 6-6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    <button class="right-expand lower-toggle" type="button" aria-label="Perluas panel selection" aria-controls="selection-panel" aria-expanded="false" title="Perluas panel ke kiri"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m15 18-6-6 6-6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    <footer class="footer-bar"><div class="footer-meta"><span>1 tile = 64 × 32 px</span><strong id="footer-tile">Arahkan kursor ke tile</strong><output class="readout">Mockup UI</output></div><span id="footer-zoom">Zoom: 100%</span></footer>
+    <script>
+      const inspector = document.querySelector("#side-panel");
+      const panelToggle = document.querySelector(".panel-toggle");
+      const canvas = document.querySelector("#mock-plane");
+      const context = canvas.getContext("2d");
+      const board = document.querySelector(".board");
+      const axisPadding = 24;
+      let gridSize = 12;
+      let hoveredTile = null;
+      let noticeTimer;
+
+      function resizePlane() {
+        const width = gridSize * 64 + axisPadding * 2;
+        const height = gridSize * 32 + axisPadding * 2;
+        board.style.width = `${width}px`;
+        board.style.height = `${height}px`;
+        board.style.marginLeft = `${-width / 2}px`;
+        board.style.marginTop = `${-height / 2}px`;
+        canvas.style.width = `${width}px`;
+        canvas.style.height = `${height}px`;
+      }
+
+      function notify(message) {
+        const notice = document.querySelector("#notice");
+        notice.textContent = message;
+        notice.classList.add("is-visible");
+        clearTimeout(noticeTimer);
+        noticeTimer = setTimeout(() => notice.classList.remove("is-visible"), 1500);
+      }
+
+      function tileCoordinate(column, row) {
+        const originIndex = Math.floor(gridSize / 2);
+        return { x: column - originIndex, y: originIndex - row };
+      }
+
+      function signed(value) {
+        return value > 0 ? `+${value}` : String(value);
+      }
+
+      function renderMockPlane() {
+        const planeWidth = gridSize * 64;
+        const planeHeight = gridSize * 32;
+        const width = planeWidth + axisPadding * 2;
+        const height = planeHeight + axisPadding * 2;
+        const ratio = Math.min(window.devicePixelRatio || 1, 2, Math.sqrt(8_000_000 / (width * height)));
+        const bufferWidth = Math.round(width * ratio);
+        const bufferHeight = Math.round(height * ratio);
+        if (canvas.width !== bufferWidth) canvas.width = bufferWidth;
+        if (canvas.height !== bufferHeight) canvas.height = bufferHeight;
+        context.setTransform(bufferWidth / width, 0, 0, bufferHeight / height, 0, 0);
+        context.clearRect(0, 0, width, height);
+        const halfWidth = 32;
+        const halfHeight = 16;
+        context.save();
+        context.translate(width / 2, axisPadding);
+        for (let diagonal = 0; diagonal < gridSize * 2 - 1; diagonal++) {
+          for (let row = 0; row < gridSize; row++) {
+            const column = diagonal - row;
+            if (column < 0 || column >= gridSize) continue;
+            const x = (column - row) * halfWidth;
+            const y = (column + row) * halfHeight;
+            const hovered = hoveredTile?.row === row && hoveredTile?.column === column;
+            context.beginPath();
+            context.moveTo(x, y);
+            context.lineTo(x + halfWidth, y + halfHeight);
+            context.lineTo(x, y + halfHeight * 2);
+            context.lineTo(x - halfWidth, y + halfHeight);
+            context.closePath();
+            context.fillStyle = hovered ? "#8f7438" : "#383838";
+            context.fill();
+            if (document.querySelector("#grid-toggle").checked) {
+              context.strokeStyle = hovered ? "#c3a85f" : "#484848";
+              context.lineWidth = 1;
+              context.stroke();
+            }
+          }
+        }
+        context.restore();
+        if (document.querySelector("#axis-toggle").checked) {
+          const centerY = axisPadding + planeHeight / 2;
+          const centerX = width / 2;
+          const halfDeltaX = planeWidth / 4;
+          const halfDeltaY = planeHeight / 4;
+          context.lineWidth = 1;
+          // X and Y follow the isometric grid directions and stop at the
+          // plane boundary. The intersection is the grid's (0, 0) point.
+          context.beginPath();
+          context.moveTo(centerX - halfDeltaX, centerY - halfDeltaY);
+          context.lineTo(centerX + halfDeltaX, centerY + halfDeltaY);
+          context.strokeStyle = "#ed5963";
+          context.stroke();
+          context.beginPath();
+          context.moveTo(centerX - halfDeltaX, centerY + halfDeltaY);
+          context.lineTo(centerX + halfDeltaX, centerY - halfDeltaY);
+          context.strokeStyle = "#68c978";
+          context.stroke();
+
+          context.beginPath();
+          context.moveTo(centerX, centerY);
+          context.lineTo(centerX, centerY - 56);
+          context.strokeStyle = "#42a5ff";
+          context.stroke();
+          context.beginPath();
+          context.moveTo(centerX, centerY - 64);
+          context.lineTo(centerX - 4, centerY - 56);
+          context.lineTo(centerX + 4, centerY - 56);
+          context.closePath();
+          context.fillStyle = "#42a5ff";
+          context.fill();
+        }
+
+        if (document.querySelector("#coord-toggle").checked) {
+          context.save();
+          context.translate(width / 2, axisPadding);
+          context.font = "7.5px ui-sans-serif, system-ui, sans-serif";
+          context.textAlign = "center";
+          context.textBaseline = "middle";
+          context.fillStyle = "rgba(220, 226, 234, .78)";
+          const isoAngle = Math.atan2(halfHeight, halfWidth);
+          for (let row = 0; row < gridSize; row++) {
+            for (let column = 0; column < gridSize; column++) {
+              const coordinate = tileCoordinate(column, row);
+              const x = (column - row) * 32;
+              const y = (column + row + 1) * 16;
+              context.save();
+              context.translate(x, y);
+              context.rotate(isoAngle);
+              context.fillText(`${coordinate.x},${coordinate.y}`, 0, 0);
+              context.restore();
+            }
+          }
+          context.restore();
+        }
+      }
+
+      function updateHover(event) {
+        if (event.pointerType === "touch") return;
+        const rect = canvas.getBoundingClientRect();
+        const width = gridSize * 64;
+        const height = gridSize * 32;
+        const canvasWidth = width + axisPadding * 2;
+        const canvasHeight = height + axisPadding * 2;
+        const x = ((event.clientX - rect.left) / rect.width) * canvasWidth - axisPadding - width / 2;
+        const y = ((event.clientY - rect.top) / rect.height) * canvasHeight - axisPadding;
+        const column = Math.floor((x / 32 + y / 16) / 2);
+        const row = Math.floor((y / 16 - x / 32) / 2);
+        const nextHovered = row >= 0 && row < gridSize && column >= 0 && column < gridSize
+          ? { row, column }
+          : null;
+        if (nextHovered?.row === hoveredTile?.row && nextHovered?.column === hoveredTile?.column) return;
+        hoveredTile = nextHovered;
+        const coordinateValue = hoveredTile
+          ? tileCoordinate(hoveredTile.column, hoveredTile.row)
+          : null;
+        const coordinate = coordinateValue
+          ? `[${signed(coordinateValue.x)}, ${signed(coordinateValue.y)}]`
+          : "—";
+        const tileLabel = hoveredTile
+          ? `Tile X ${signed(coordinateValue.x)}, Y ${signed(coordinateValue.y)}`
+          : "Belum ada tile diarahkan";
+        document.querySelector("#selection-index").textContent = hoveredTile ? coordinate : "—";
+        document.querySelector("#selection-summary").textContent = tileLabel;
+        document.querySelector("#selection-hint").textContent = hoveredTile
+          ? "Informasi hover mockup · tile tidak dipilih"
+          : "Arahkan kursor ke plane untuk melihat informasi tile";
+        document.querySelector("#selection-coordinate").textContent = coordinate;
+        document.querySelector("#selection-center").textContent = hoveredTile
+          ? `${(hoveredTile.column - hoveredTile.row) * 32}, ${(hoveredTile.column + hoveredTile.row + 1 - gridSize) * 16} px`
+          : "—";
+        document.querySelector("#selection-elevation").textContent = "0";
+        document.querySelector("#selection-rise").textContent = "0 px";
+        document.querySelector("#footer-tile").textContent = hoveredTile
+          ? `Hover: ${tileLabel} ${coordinate}`
+          : "Arahkan kursor ke tile";
+        renderMockPlane();
+      }
+
+      function clearHover() {
+        hoveredTile = null;
+        document.querySelector("#selection-index").textContent = "—";
+        document.querySelector("#selection-summary").textContent = "Belum ada tile diarahkan";
+        document.querySelector("#selection-hint").textContent = "Arahkan kursor ke plane untuk melihat informasi tile";
+        document.querySelector("#selection-coordinate").textContent = "—";
+        document.querySelector("#selection-center").textContent = "—";
+        document.querySelector("#selection-elevation").textContent = "0";
+        document.querySelector("#selection-rise").textContent = "0 px";
+        document.querySelector("#footer-tile").textContent = "Arahkan kursor ke tile";
+        renderMockPlane();
+      }
+
+      canvas.addEventListener("pointermove", (event) => {
+        if (event.pointerType !== "touch") updateHover(event);
+      });
+      canvas.addEventListener("pointerleave", clearHover);
+      document.querySelector("#grid-slider").addEventListener("input", (event) => {
+        gridSize = Number(event.currentTarget.value);
+        document.querySelector("#grid-value").textContent = `${gridSize} × ${gridSize}`;
+        document.querySelector("#plane-size").textContent = `${gridSize * 64} × ${gridSize * 32} px`;
+        document.querySelector("#plane-label").textContent = `Plane · ${gridSize} × ${gridSize} tile`;
+        clearHover();
+        resizePlane();
+        renderMockPlane();
+      });
+      document.querySelector("#grid-toggle").addEventListener("change", renderMockPlane);
+      document.querySelector("#axis-toggle").addEventListener("change", renderMockPlane);
+      document.querySelector("#coord-toggle").addEventListener("change", renderMockPlane);
+      document.querySelector("#zoom-slider").addEventListener("input", (event) => {
+        const zoom = Number(event.currentTarget.value);
+        board.style.transform = `scale(${zoom / 100})`;
+        document.querySelector("#zoom-value").textContent = `${zoom}%`;
+        document.querySelector("#footer-zoom").textContent = `Zoom: ${zoom}%`;
+      });
+      panelToggle.addEventListener("click", () => {
+        const hidden = inspector.classList.toggle("is-hidden");
+        panelToggle.setAttribute("aria-expanded", String(!hidden));
+        panelToggle.setAttribute("aria-label", hidden ? "Tampilkan inspector" : "Sembunyikan inspector");
+      });
+      document.querySelectorAll(".right-expand").forEach((button) => {
+        button.addEventListener("click", () => {
+          const target = document.getElementById(button.getAttribute("aria-controls"));
+          const expanded = target.classList.toggle("is-expanded");
+          button.classList.toggle("is-expanded", expanded);
+          button.setAttribute("aria-expanded", String(expanded));
+          const label = expanded ? "Perkecil panel" : "Perluas panel ke kiri";
+          button.setAttribute("aria-label", label);
+          button.title = label;
+          if (target.id === "objects-panel") document.body.classList.toggle("right-wide", expanded);
+        });
+      });
+      document.querySelectorAll("[data-notice]").forEach((button) => {
+        button.addEventListener("click", () => notify(button.dataset.notice));
+      });
+      window.addEventListener("resize", renderMockPlane);
+      resizePlane();
+      renderMockPlane();
+    </script>
+  </body>
+</html>
+
+
+
+
+
+

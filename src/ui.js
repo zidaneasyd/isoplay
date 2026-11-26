@@ -83,8 +83,10 @@ export function initializeInspector(
     { panel: elements.selectionPanel, toggle: elements.selectionExpand, label: "tile selection" },
   ];
   const updateRightPanelLayout = () => {
-    const expanded = rightPanels.some(({ panel }) => panel?.classList?.contains("is-expanded"));
-    documentRef?.body?.classList?.toggle("right-wide", expanded);
+    // The action rail sits beside the upper panel, so only that panel should
+    // move it horizontally. Expanding the lower panel must not move the icons.
+    const upperExpanded = elements.objectsPanel?.classList?.contains("is-expanded") ?? false;
+    documentRef?.body?.classList?.toggle("right-wide", upperExpanded);
   };
 
   // Synchronize the quick-action rail and both expand controls from the real
