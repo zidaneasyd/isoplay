@@ -26,7 +26,7 @@ export function zoomLevelForWheel(currentZoom, deltaY) {
 
 /**
  * Keep one plane-local focus point at the same screen position while zooming.
- * focusX/focusY are measured from the visual center of the plane in plane units.
+ * focusX/focusY are measured from the supplied camera anchor in plane units.
  */
 export function panToKeepZoomFocus(pan, oldZoom, nextZoom, focusX, focusY) {
   const safePan = {
@@ -43,16 +43,18 @@ export function panToKeepZoomFocus(pan, oldZoom, nextZoom, focusX, focusY) {
   };
 }
 
-/** Read a pointer's plane-local offset from the transformed plane center. */
-export function zoomFocusFromRect(rect, clientX, clientY, zoom) {
+/** Read a pointer's plane-local offset from a canvas-local camera anchor. */
+export function zoomFocusFromRect(rect, clientX, clientY, zoom, anchor) {
   const scale = clampZoom(zoom);
   if (!rect || !Number.isFinite(clientX) || !Number.isFinite(clientY) ||
       !Number.isFinite(rect.left) || !Number.isFinite(rect.top) ||
       !Number.isFinite(rect.width) || !Number.isFinite(rect.height) ||
       rect.width <= 0 || rect.height <= 0) return null;
 
+  const anchorX = Number.isFinite(anchor?.x) ? anchor.x : rect.width / (2 * scale);
+  const anchorY = Number.isFinite(anchor?.y) ? anchor.y : rect.height / (2 * scale);
   return {
-    x: (clientX - (rect.left + rect.width / 2)) / scale,
-    y: (clientY - (rect.top + rect.height / 2)) / scale,
+    x: (clientX - (rect.left + anchorX * scale)) / scale,
+    y: (clientY - (rect.top + anchorY * scale)) / scale,
   };
 }

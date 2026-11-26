@@ -50,11 +50,14 @@ function makeHarness({ width = 1280, height = 800, devicePixelRatio = 2 } = {}) 
       const panY = Number(y);
       const zoom = Number(z);
       const canvasHeight = Number.parseFloat(board.style.height) || PLANE.height;
+      const origin = board.style.transformOrigin?.match(/([\d.]+)px\s+([\d.]+)px/);
+      const originX = origin ? Number(origin[1]) : PLANE.width / 2;
+      const originY = origin ? Number(origin[2]) : canvasHeight / 2;
       const centerX = window.innerWidth / 2 + panX;
       const centerY = window.innerHeight / 2 + panY;
       return {
-        left: centerX - (PLANE.width * zoom) / 2,
-        top: centerY - (canvasHeight * zoom) / 2,
+        left: centerX - originX * zoom,
+        top: centerY - originY * zoom,
         width: PLANE.width * zoom,
         height: canvasHeight * zoom,
       };
@@ -226,6 +229,97 @@ test("initialization uses fixed layout dimensions and HiDPI backing resolution",
     assert.match(h.board.style.transform, /translate\(0px, 0px\) scale\(1\)$/);
     assert.equal(h.readout.textContent, "Arahkan kursor ke tile");
   } finally { h.restore(); }
+});
+
+test("ground-plane screen coordinates remain fixed as top padding grows and shrinks", () => {
+  const h = makeHarness({ width: 1280, height: 720, devicePixelRatio: 1.5 });
+  try {
+    const target = { row: 5, column: 5 };
+    const center = tileCenter(target.row, target.column);
+    const groundPoints = [
+      { x: -PLANE.width / 2, y: 0 }, { x: 0, y: 0 },
+      { x: PLANE.width / 2, y: PLANE.height / 2 },
+      { x: 0, y: PLANE.height }, { x: -PLANE.width / 2, y: PLANE.height / 2 },
+      { x: center.x, y: center.y },
+    ];
+    const screenPoints = () => {
+      const rect = h.canvas.getBoundingClientRect();
+      const { topPadding, zoom } = h.state.getState();
+      return groundPoints.map(({ x, y }) => ({
+        x: rect.left + (PLANE.width / 2 + x) * zoom,
+        y: rect.top + (topPadding + y) * zoom,
+      }));
+    };
+    const initialPoints = screenPoints();
+    const rect = h.canvas.getBoundingClientRect();
+    h.dispatch("click", {
+      clientX: rect.left + (PLANE.width / 2 + center.x),
+      clientY: rect.top + center.y,
+      button: 0,
+    });
+    const increase = h.uiElements.get("#elevation-increase");
+    const decrease = h.uiElements.get("#elevation-decrease");
+    const expectedPadding = [8, 16, 24, 40, 80];
+    const levels = [1, 2, 3, 5, 10];
+    for (let i = 0; i < levels.length; i++) {
+      while (h.state.getState().activeElevation < levels[i]) increase.dispatch("click");
+      assert.equal(h.state.getState().topPadding, expectedPadding[i]);
+      assert.equal(h.board.style.marginTop, `${-(PLANE.height / 2 + expectedPadding[i])}px`);
+      assert.equal(h.board.style.transformOrigin, `${PLANE.width / 2}px ${PLANE.height / 2 + expectedPadding[i]}px`);
+      screenPoints().forEach((point, index) => {
+        assert.ok(Math.abs(point.x - initialPoints[index].x) <= 0.01, `ground point ${index} X at padding ${expectedPadding[i]}`);
+        assert.ok(Math.abs(point.y - initialPoints[index].y) <= 0.01, `ground point ${index} Y at padding ${expectedPadding[i]}`);
+      });
+    }
+    while (h.state.getState().activeElevation > 0) decrease.dispatch("click");
+    assert.equal(h.state.getState().topPadding, 0);
+    assert.deepEqual(screenPoints(), initialPoints);
+  } finally { h.restore(); }
+});
+
+test("ground plane anchor stays consistent across camera, viewport and DPR matrix", () => {
+  const environments = [
+    { width: 390, height: 844, devicePixelRatio: 1 },
+    { width: 768, height: 900, devicePixelRatio: 1.25 },
+    { width: 1280, height: 720, devicePixelRatio: 1.5 },
+    { width: 1920, height: 1080, devicePixelRatio: 2 },
+  ];
+  const zooms = [0.25, 0.5, 1, 2, 4];
+  const pans = [{ x: 0, y: 0 }, { x: 73, y: -41 }, { x: -55, y: 92 }];
+  for (const environment of environments) {
+    const h = makeHarness(environment);
+    try {
+      const target = { row: 0, column: 0 };
+      const center = tileCenter(target.row, target.column);
+      let rect = h.canvas.getBoundingClientRect();
+      h.dispatch("click", {
+        clientX: rect.left + PLANE.width / 2 + center.x,
+        clientY: rect.top + center.y,
+        button: 0,
+      });
+      for (let level = 0; level < 10; level++) h.uiElements.get("#elevation-increase").dispatch("click");
+
+      for (const zoom of zooms) {
+        for (const pan of pans) {
+          h.uiElements.get("#reset-camera").dispatch("click");
+          const zoomDelta = -Math.log(zoom) / 0.001;
+          wheelAt(h, environment.width / 2 + 17, environment.height / 2 - 23, zoomDelta);
+          rect = h.canvas.getBoundingClientRect();
+          h.dispatch("pointerdown", { button: 1, pointerId: 77, clientX: rect.left + 20, clientY: rect.top + 30, preventDefault() {} });
+          h.dispatch("pointermove", { pointerId: 77, clientX: rect.left + 20 + pan.x, clientY: rect.top + 30 + pan.y });
+          h.dispatch("pointerup", { pointerId: 77 });
+          rect = h.canvas.getBoundingClientRect();
+          const state = h.state.getState();
+          assert.ok(Math.abs((rect.left + (PLANE.width / 2 + center.x) * state.zoom) -
+            (environment.width / 2 + state.pan.x + center.x * state.zoom)) <= 0.01);
+          assert.ok(Math.abs((rect.top + (state.topPadding + center.y) * state.zoom) -
+            (environment.height / 2 + state.pan.y + (center.y - PLANE.height / 2) * state.zoom)) <= 0.01);
+          assert.ok(Math.abs(state.zoom - zoom) < 1e-10, `zoom ${zoom} at ${environment.width}x${environment.height}`);
+          assert.equal(h.canvas.height, Math.round((PLANE.height + 80) * environment.devicePixelRatio * state.zoom));
+        }
+      }
+    } finally { h.restore(); }
+  }
 });
 
 test("hover, click, active state and pointer-leave work in canvas coordinates", () => {

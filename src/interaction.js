@@ -36,13 +36,14 @@ export function initializePlane() {
   // grows with the highest tile so raised top faces are never clipped.
   function updateTransform() {
     const canvasHeight = PLANE.height + topPadding;
+    const anchorY = PLANE.height / 2 + topPadding;
     board.style.width = `${PLANE.width}px`;
     board.style.height = `${canvasHeight}px`;
-    board.style.marginTop = `${-canvasHeight / 2}px`;
+    board.style.marginTop = `${-anchorY}px`;
     board.style.marginLeft = `${-PLANE.width / 2}px`;
     canvas.style.width = `${PLANE.width}px`;
     canvas.style.height = `${canvasHeight}px`;
-    board.style.transformOrigin = "center center";
+    board.style.transformOrigin = `${PLANE.width / 2}px ${anchorY}px`;
     board.style.transform = `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`;
     inspector?.render({
       zoom, pan, hoveredTile, activeTile, elevations,
@@ -175,7 +176,10 @@ export function initializePlane() {
     const nextZoom = zoomLevelForWheel(oldZoom, delta);
     if (nextZoom === oldZoom) return;
 
-    const focus = zoomFocusFromRect(rect, event.clientX, event.clientY, oldZoom);
+    const focus = zoomFocusFromRect(rect, event.clientX, event.clientY, oldZoom, {
+      x: PLANE.width / 2,
+      y: PLANE.height / 2 + topPadding,
+    });
     if (!focus) return;
     pan = panToKeepZoomFocus(pan, oldZoom, nextZoom, focus.x, focus.y);
     zoom = nextZoom;

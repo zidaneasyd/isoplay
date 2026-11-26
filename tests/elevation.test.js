@@ -15,7 +15,7 @@ import {
 } from "../plane.js";
 
 function createContext() {
-  const calls = { fills: [], strokes: [], clears: [] };
+  const calls = { fills: [], fillPaths: [], strokes: [], clears: [], translations: [], path: [] };
   return {
     calls,
     fillStyle: "",
@@ -23,8 +23,10 @@ function createContext() {
     lineWidth: 1,
     setTransform() {},
     clearRect(...args) { calls.clears.push(args); },
-    save() {}, restore() {}, translate() {}, beginPath() {}, moveTo() {}, lineTo() {}, closePath() {},
-    fill() { calls.fills.push(this.fillStyle); },
+    save() {}, restore() {}, translate(...args) { calls.translations.push(args); },
+    beginPath() { calls.path = []; },
+    moveTo(x, y) { calls.path.push({ x, y }); }, lineTo(x, y) { calls.path.push({ x, y }); }, closePath() {},
+    fill() { calls.fills.push(this.fillStyle); calls.fillPaths.push({ color: this.fillStyle, points: calls.path.map(point => ({ ...point })) }); },
     stroke() { calls.strokes.push({ color: this.strokeStyle, width: this.lineWidth }); },
   };
 }
@@ -152,6 +154,65 @@ test("raised tile renderer paints a top face and two visible side faces", () => 
   assert.equal(context.calls.clears.length, 1);
   assert.deepEqual(context.calls.clears[0], [0, 0, PLANE.width, PLANE.height + 24]);
   assert.equal(context.calls.fills.length, 4, "ground + two side faces + top face");
+});
+
+test("rendered top faces rise by exactly eight CSS pixels per level", () => {
+  const tile = { row: 4, column: 5 };
+  const x = (tile.column - tile.row) * PLANE.tileWidth / 2;
+  const y = (tile.column + tile.row) * PLANE.tileHeight / 2;
+  for (const level of [0, 1, 2, 3, 5, 10]) {
+    const context = createContext();
+    const elevations = new Map();
+    setTileElevation(elevations, tile, level);
+    const padding = level * ELEVATION_STEP_PX;
+    drawPlane(context, { elevations, topPadding: padding });
+    assert.deepEqual(context.calls.translations.at(-1), [PLANE.width / 2, padding]);
+    if (level === 0) continue;
+    const expected = [
+      { x, y: y - level * ELEVATION_STEP_PX },
+      { x: x + PLANE.tileWidth / 2, y: y + PLANE.tileHeight / 2 - level * ELEVATION_STEP_PX },
+      { x, y: y + PLANE.tileHeight - level * ELEVATION_STEP_PX },
+      { x: x - PLANE.tileWidth / 2, y: y + PLANE.tileHeight / 2 - level * ELEVATION_STEP_PX },
+    ];
+    const face = context.calls.fillPaths.find(({ color, points }) => color === PLANE.colors.tile &&
+      points.length === 4 && points.every((point, index) => point.x === expected[index].x && point.y === expected[index].y));
+    assert.ok(face, `top face matches exact level-${level} geometry`);
+    assert.equal(padding + face.points[0].y, y,
+      "maximum-height top face begins at the top of its padded canvas region");
+  }
+});
+
+test("neighbor elevation differences render only the exposed side height", () => {
+  const tile = { row: 4, column: 5 };
+  const x = (tile.column - tile.row) * PLANE.tileWidth / 2;
+  const y = (tile.column + tile.row) * PLANE.tileHeight / 2;
+  const elevations = new Map();
+  setTileElevation(elevations, tile, 5);
+  setTileElevation(elevations, { row: 5, column: 5 }, 2);
+  setTileElevation(elevations, { row: 4, column: 6 }, 3);
+  const context = createContext();
+  drawPlane(context, { elevations, topPadding: 5 * ELEVATION_STEP_PX });
+  const left = [
+    { x: x - 32, y: y + 16 - 40 }, { x, y: y + 32 - 40 },
+    { x, y: y + 32 - 16 }, { x: x - 32, y: y + 16 - 16 },
+  ];
+  const right = [
+    { x, y: y + 32 - 40 }, { x: x + 32, y: y + 16 - 40 },
+    { x: x + 32, y: y + 16 - 24 }, { x, y: y + 32 - 24 },
+  ];
+  const matches = expected => context.calls.fillPaths.filter(({ points }) => points.length === expected.length &&
+    points.every((point, index) => point.x === expected[index].x && point.y === expected[index].y));
+  assert.equal(matches(left).length, 1, "left face spans the 5-to-2 level difference once");
+  assert.equal(matches(right).length, 1, "right face spans the 5-to-3 level difference once");
+
+  setTileElevation(elevations, { row: 5, column: 5 }, 5);
+  setTileElevation(elevations, { row: 4, column: 6 }, 5);
+  const equalContext = createContext();
+  drawPlane(equalContext, { elevations, topPadding: 5 * ELEVATION_STEP_PX });
+  assert.equal(equalContext.calls.fillPaths.some(({ points }) =>
+    points.length === 4 && (matches(left).some(face => JSON.stringify(face.points) === JSON.stringify(points)) ||
+      matches(right).some(face => JSON.stringify(face.points) === JSON.stringify(points)))), false,
+  "equal-height shared edges do not create internal walls");
 });
 
 test("multi-tile elevation patterns render independent side heights without losing the ground grid", () => {
