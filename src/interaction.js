@@ -1,6 +1,7 @@
 import { DEFAULT_ZOOM, PLANE } from "./config.js";
 import { hitTestTile, toggleActiveTile } from "./geometry.js";
 import { drawPlane } from "./render.js";
+import { initializeInspector } from "./ui.js";
 import {
   normalizeWheelDelta,
   panToKeepZoomFocus,
@@ -26,6 +27,7 @@ export function initializePlane() {
   let pan = { x: 0, y: 0 };
   let drag = null;
   let lastPointer = null;
+  let inspector;
 
   // The plane's layout box stays at its native dimensions. Zoom is a visual
   // transform around its center, avoiding CSS grid re-centering on every wheel.
@@ -36,6 +38,7 @@ export function initializePlane() {
     canvas.style.height = `${PLANE.height}px`;
     board.style.transformOrigin = "center center";
     board.style.transform = `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`;
+    inspector?.render({ zoom, pan, hoveredTile, activeTile, dragging: Boolean(drag) });
   }
 
   function draw() {
@@ -50,6 +53,7 @@ export function initializePlane() {
   }
 
   function updateReadout() {
+    inspector?.render({ zoom, pan, hoveredTile, activeTile, dragging: Boolean(drag) });
     if (!readout) return;
     if (hoveredTile) {
       readout.textContent = `Hover: Kolom ${hoveredTile.column + 1}, Baris ${hoveredTile.row + 1} [${hoveredTile.column}, ${hoveredTile.row}]`;
@@ -59,6 +63,22 @@ export function initializePlane() {
       readout.textContent = "Arahkan kursor ke tile";
     }
   }
+
+  function resetCamera() {
+    zoom = DEFAULT_ZOOM;
+    pan = { x: 0, y: 0 };
+    drag = null;
+    canvas.style.cursor = "";
+    updateTransform();
+    draw();
+    if (lastPointer) updateHover(lastPointer);
+    else {
+      hoveredTile = null;
+      updateReadout();
+    }
+  }
+
+  inspector = initializeInspector(document, { onResetCamera: resetCamera });
 
   function updateHover(event) {
     if (!event || !Number.isFinite(event.clientX) || !Number.isFinite(event.clientY)) return;
@@ -82,8 +102,8 @@ export function initializePlane() {
         y: pan.y + event.clientY - drag.y,
       };
       drag = { ...drag, x: event.clientX, y: event.clientY };
-      updateTransform();
       hoveredTile = null;
+      updateTransform();
     }
     updateHover(event);
   }
@@ -92,6 +112,7 @@ export function initializePlane() {
     if (!drag || (event?.pointerId !== undefined && drag.pointerId !== event.pointerId)) return;
     drag = null;
     canvas.style.cursor = "";
+    inspector?.render({ zoom, pan, hoveredTile, activeTile, dragging: false });
   }
 
   canvas.addEventListener("pointermove", handlePointerMove);
@@ -99,6 +120,7 @@ export function initializePlane() {
     if (event.button !== 1) return;
     event.preventDefault?.();
     drag = { pointerId: event.pointerId, x: event.clientX, y: event.clientY };
+    inspector?.render({ zoom, pan, hoveredTile, activeTile, dragging: true });
     try { canvas.setPointerCapture?.(event.pointerId); } catch { /* optional in test/headless contexts */ }
     canvas.style.cursor = "grabbing";
   });

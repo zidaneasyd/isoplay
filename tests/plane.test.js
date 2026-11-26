@@ -60,9 +60,39 @@ function makeHarness({ width = 1280, height = 800, devicePixelRatio = 2 } = {}) 
     },
   };
   const readout = { textContent: "" };
+  const uiElements = new Map();
+  const selectors = [
+    "#inspector-panel", "#inspector-toggle", "#reset-camera", "#plane-size", "#tile-size",
+    "#hover-value", "#selected-value", "#selection-summary", "#selected-index",
+    "#selected-detail-coord", "#selected-center", "#camera-zoom", "#camera-pan",
+    "#camera-mode", "#footer-selection", "#footer-zoom",
+  ];
+  for (const selector of selectors) {
+    const handlers = new Map();
+    const attributes = {};
+    const classes = new Set();
+    const element = {
+      textContent: "",
+      attributes,
+      addEventListener(name, callback) {
+        const callbacks = handlers.get(name) ?? [];
+        callbacks.push(callback);
+        handlers.set(name, callbacks);
+      },
+      dispatch(name, event = {}) { for (const callback of handlers.get(name) ?? []) callback(event); },
+      setAttribute(name, value) { attributes[name] = value; },
+    };
+    if (selector === "#inspector-panel") {
+      element.classList = { toggle(name) {
+        if (classes.has(name)) { classes.delete(name); return false; }
+        classes.add(name); return true;
+      } };
+    }
+    uiElements.set(selector, element);
+  }
   const previousDocument = globalThis.document;
   const previousWindow = globalThis.window;
-  globalThis.document = { querySelector: (selector) => selector === "#plane" ? canvas : readout };
+  globalThis.document = { querySelector: (selector) => selector === "#plane" ? canvas : selector === "#readout" ? readout : uiElements.get(selector) ?? null };
   globalThis.window = {
     devicePixelRatio,
     innerWidth: width,
@@ -75,7 +105,7 @@ function makeHarness({ width = 1280, height = 800, devicePixelRatio = 2 } = {}) 
   };
 
   return {
-    canvas, board, readout, context,
+    canvas, board, readout, context, uiElements,
     state: initializePlane(),
     dispatch(name, event = {}) {
       for (const listener of listeners.get(name) ?? []) listener(event);
@@ -588,4 +618,64 @@ test("hover clears outside the plane, returns on re-entry, and an empty click ke
     });
     assert.deepEqual(h.state.getState().hoveredTile, { row: 6, column: 6 });
   } finally { h.restore(); }
+});
+
+test("workspace inspector mirrors hover, selection, pan and zoom through varied viewport/DPR cases", () => {
+  const environments = [
+    { width: 390, height: 844, devicePixelRatio: 1 },
+    { width: 800, height: 600, devicePixelRatio: 1.25 },
+    { width: 1280, height: 720, devicePixelRatio: 2 },
+    { width: 1920, height: 1080, devicePixelRatio: 3 },
+  ];
+  const targets = [[0, 0], [0, 11], [5, 5], [11, 0], [11, 11]];
+
+  for (const environment of environments) {
+    const h = makeHarness(environment);
+    try {
+      assert.equal(h.uiElements.get("#plane-size").textContent, `${PLANE.columns} × ${PLANE.rows} tile`);
+      assert.equal(h.uiElements.get("#camera-zoom").textContent, "100%");
+
+      for (const [row, column] of targets) {
+        const center = tileCenter(row, column);
+        const rect = h.canvas.getBoundingClientRect();
+        const pointer = {
+          clientX: rect.left + rect.width / 2 + center.x,
+          clientY: rect.top + center.y,
+        };
+        h.dispatch("pointermove", pointer);
+        assert.equal(h.uiElements.get("#hover-value").textContent,
+          `Kolom ${column + 1}, Baris ${row + 1} · [${column}, ${row}]`);
+        h.dispatch("click", { ...pointer, button: 0 });
+        assert.equal(h.uiElements.get("#selected-index").textContent, `[${column}, ${row}]`);
+        assert.equal(h.uiElements.get("#selection-summary").textContent, "Tile sedang dipilih");
+      }
+
+      const rect = h.canvas.getBoundingClientRect();
+      const focusX = rect.left + rect.width * 0.72;
+      const focusY = rect.top + rect.height * 0.36;
+      wheelAt(h, focusX, focusY, -700);
+      assert.equal(h.uiElements.get("#camera-zoom").textContent,
+        `${Math.round(h.state.getState().zoom * 100)}%`);
+
+      const panStart = h.canvas.getBoundingClientRect();
+      const startX = panStart.left + panStart.width / 2;
+      const startY = panStart.top + panStart.height / 2;
+      h.dispatch("pointerdown", {
+        button: 1, pointerId: 91, clientX: startX, clientY: startY, preventDefault() {},
+      });
+      assert.equal(h.uiElements.get("#camera-mode").textContent, "Menggeser");
+      h.dispatch("pointermove", { pointerId: 91, clientX: startX + 37, clientY: startY - 19 });
+      assert.equal(h.uiElements.get("#camera-pan").textContent,
+        `${h.state.getState().pan.x >= 0 ? "+" : ""}${Math.round(h.state.getState().pan.x)}, ${h.state.getState().pan.y >= 0 ? "+" : ""}${Math.round(h.state.getState().pan.y)} px`);
+      h.dispatch("pointerup", { pointerId: 91 });
+      assert.equal(h.uiElements.get("#camera-mode").textContent, "Siap");
+
+      h.uiElements.get("#reset-camera").dispatch("click");
+      assert.deepEqual(h.state.getState().pan, { x: 0, y: 0 });
+      assert.equal(h.state.getState().zoom, 1);
+      assert.equal(h.uiElements.get("#camera-zoom").textContent, "100%");
+      assert.equal(h.uiElements.get("#camera-pan").textContent, "+0, +0 px");
+      assert.ok(h.state.getState().activeTile, "reset kamera tidak boleh menghapus tile terpilih");
+    } finally { h.restore(); }
+  }
 });

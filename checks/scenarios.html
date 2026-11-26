@@ -199,7 +199,68 @@
       } finally { app.close(); }
     });
 
-    details.textContent = "Skenario mencakup 4 ukuran viewport, 5 posisi anchor, 16 tile/viewport, serta kombinasi pan, zoom, resize, DPR, dan batas skala.";
+    await check("inspector aktual tersinkron dengan hover, seleksi, kamera, dan reset", async () => {
+      const app = await openApp(1280, 720);
+      try {
+        const doc = app.win.document;
+        const get = (selector) => doc.querySelector(selector);
+        assert(get("#inspector-panel") && get("#inspector-toggle"), "panel inspector tidak ditemukan");
+        assert(get("#reset-camera") && get("#selection-summary"), "kontrol inspector tidak ditemukan");
+        assert(get("#plane-size").textContent === "12 × 12 tile", "dimensi plane tidak sesuai konfigurasi aktif");
+
+        const rect = app.rect();
+        const row = 2;
+        const column = 7;
+        const x = rect.left + rect.width / 2 + (column - row) * 32;
+        const y = rect.top + (column + row + 1) * 16;
+        app.move(x, y);
+        assert(get("#hover-value").textContent.includes("[7, 2]"), "nilai hover inspector tidak diperbarui");
+        app.canvas.dispatchEvent(new app.win.MouseEvent("click", {
+          button: 0, clientX: x, clientY: y, bubbles: true,
+        }));
+        assert(get("#selected-index").textContent === "[7, 2]", "tile aktif tidak masuk ke inspector");
+        assert(get("#selection-summary").textContent === "Tile sedang dipilih", "status seleksi salah");
+        assert(get("#selected-center").textContent === "160, 160 px", "pusat tile tidak sesuai koordinat geometry");
+
+        app.wheel(x, y, -650);
+        assert(get("#camera-zoom").textContent !== "100%", "zoom inspector tidak mengikuti wheel");
+        const panRect = app.rect();
+        const panX = panRect.left + panRect.width / 2;
+        const panY = panRect.top + panRect.height / 2;
+        app.down(panX, panY, 1, 1);
+        assert(get("#camera-mode").textContent === "Menggeser", "status drag tidak diperbarui");
+        app.move(panX + 42, panY - 18);
+        assert(get("#camera-pan").textContent !== "+0, +0 px", "nilai pan inspector tidak berubah");
+        app.up(1);
+        assert(get("#camera-mode").textContent === "Siap", "status kamera tidak kembali siap setelah drag");
+
+        get("#reset-camera").click();
+        assert(get("#camera-zoom").textContent === "100%", "reset tidak mengembalikan zoom");
+        assert(get("#camera-pan").textContent === "+0, +0 px", "reset tidak mengembalikan pan");
+        assert(get("#selected-index").textContent === "[7, 2]", "reset kamera seharusnya mempertahankan seleksi tile");
+        get("#inspector-toggle").click();
+        assert(get("#inspector-panel").classList.contains("is-hidden"), "panel tidak bisa disembunyikan");
+        assert(get("#inspector-toggle").getAttribute("aria-expanded") === "false", "aria-expanded tidak sinkron");
+        get("#inspector-toggle").click();
+        assert(!get("#inspector-panel").classList.contains("is-hidden"), "panel tidak bisa ditampilkan lagi");
+      } finally { app.close(); }
+    });
+
+    await check("layout inspector tidak melewati batas pada viewport desktop dan mobile", async () => {
+      for (const [width, height] of [[390, 844], [800, 600], [1280, 720], [1920, 1080]]) {
+        const app = await openApp(width, height);
+        try {
+          const panel = app.win.document.querySelector("#inspector-panel").getBoundingClientRect();
+          const selection = app.win.document.querySelector(".selection-panel").getBoundingClientRect();
+          assert(panel.left >= -1 && panel.right <= width + 1, `panel kiri meluap pada ${width}px`);
+          assert(selection.left >= -1 && selection.right <= width + 1, `panel kanan meluap pada ${width}px`);
+          assert(app.win.document.querySelector("#reset-camera").getBoundingClientRect().width > 0,
+            `kontrol reset hilang pada ${width}px`);
+        } finally { app.close(); }
+      }
+    });
+
+    details.textContent = "Skenario mencakup 4 ukuran viewport, anchor zoom, 16 tile/viewport, kombinasi pan, zoom, resize, DPR, batas skala, integrasi inspector, reset kamera, dan layout responsif.";
   </script>
 </body>
 </html>
