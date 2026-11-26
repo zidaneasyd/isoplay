@@ -12,6 +12,7 @@
       .pass { color: #8ad49b; }
       .fail { color: #ff8585; }
       .fixture { margin-top: 24px; overflow: auto; }
+      .board { width: 768px; height: 384px; }
       #plane { display: block; width: 768px; height: 384px; }
       #readout { display: block; margin: 8px 0; color: #bbb; }
       #render-fixture { position: absolute; left: -10000px; top: 0; }
@@ -24,7 +25,9 @@
 
     <section class="fixture" aria-label="Fixture integrasi plane">
       <output id="readout">Arahkan kursor ke tile</output>
-      <canvas id="plane" aria-label="Fixture plane interaktif"></canvas>
+      <div class="board">
+        <canvas id="plane" aria-label="Fixture plane interaktif"></canvas>
+      </div>
     </section>
     <canvas id="render-fixture"></canvas>
 
@@ -163,14 +166,45 @@
         const clientY = rect.top + center.y;
         canvas.dispatchEvent(new PointerEvent("pointermove", { clientX, clientY, bubbles: true }));
         assert(readout.textContent.includes("Hover: Kolom 4, Baris 3"), "readout hover tidak tepat");
-        canvas.dispatchEvent(new MouseEvent("click", { clientX, clientY, bubbles: true }));
+        canvas.dispatchEvent(new MouseEvent("click", { clientX, clientY, button: 0, bubbles: true }));
         assert(readout.textContent.includes("Hover: Kolom 4, Baris 3"), "tile tidak terpilih");
         canvas.dispatchEvent(new PointerEvent("pointerleave"));
         assert(readout.textContent.includes("Aktif: Kolom 4, Baris 3"), "koordinat aktif tidak bertahan saat pointer leave");
         canvas.dispatchEvent(new PointerEvent("pointermove", { clientX, clientY, bubbles: true }));
-        canvas.dispatchEvent(new MouseEvent("click", { clientX, clientY, bubbles: true }));
+        canvas.dispatchEvent(new MouseEvent("click", { clientX, clientY, button: 0, bubbles: true }));
         canvas.dispatchEvent(new PointerEvent("pointerleave"));
         assert(readout.textContent === "Arahkan kursor ke tile", "tile aktif tidak bisa dinonaktifkan");
+      });
+
+      check("zoom menjaga titik di bawah kursor tetap pada posisi layar", () => {
+        const canvas = document.querySelector("#plane");
+        const before = canvas.getBoundingClientRect();
+        const zoom = before.width / PLANE.width;
+        const clientX = before.left + before.width * 0.27;
+        const clientY = before.top + before.height * 0.72;
+        const focusX = (clientX - (before.left + before.width / 2)) / zoom;
+        const focusY = (clientY - (before.top + before.height / 2)) / zoom;
+        canvas.dispatchEvent(new WheelEvent("wheel", {
+          clientX, clientY, deltaY: -360, deltaMode: 0, bubbles: true, cancelable: true,
+        }));
+        const after = canvas.getBoundingClientRect();
+        const nextZoom = after.width / PLANE.width;
+        assert(Math.abs(after.left + after.width / 2 + focusX * nextZoom - clientX) < 0.05, "anchor X bergeser");
+        assert(Math.abs(after.top + after.height / 2 + focusY * nextZoom - clientY) < 0.05, "anchor Y bergeser");
+        assert(canvas.style.width === `${PLANE.width}px`, "ukuran layout CSS berubah saat zoom");
+      });
+
+      check("wheel zoom tidak melewati batas minimum dan maksimum", () => {
+        const canvas = document.querySelector("#plane");
+        let rect = canvas.getBoundingClientRect();
+        const clientX = rect.left + rect.width / 2;
+        const clientY = rect.top + rect.height / 2;
+        canvas.dispatchEvent(new WheelEvent("wheel", { clientX, clientY, deltaY: -1e7, bubbles: true, cancelable: true }));
+        rect = canvas.getBoundingClientRect();
+        assert(Math.abs(rect.width / PLANE.width - 4) < 1e-7, "zoom maksimum bukan 4x");
+        canvas.dispatchEvent(new WheelEvent("wheel", { clientX, clientY, deltaY: 1e7, bubbles: true, cancelable: true }));
+        rect = canvas.getBoundingClientRect();
+        assert(Math.abs(rect.width / PLANE.width - 0.25) < 1e-7, "zoom minimum bukan 0.25x");
       });
 
       summary.textContent = `${passed} lulus, ${failed} gagal`;

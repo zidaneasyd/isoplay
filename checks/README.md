@@ -1,13 +1,21 @@
 # Pengecekan aplikasi
 
-Jalankan suite otomatis dari folder utama proyek dengan `npm test`. Suite ini menggunakan test runner bawaan Node.js dan tidak memerlukan instalasi paket tambahan.
+## Tes otomatis Node.js
 
-`index.html` menjalankan pengecekan komponen dan integrasi plane di browser. Halaman ini menguji ukuran, proyeksi dan hit-test 144 tile, koordinat di luar plane, pemilihan tile, warna isi, stroke hover/aktif, serta alur pointer dan klik.
+Jalankan dari folder utama proyek:
 
-Jalankan server lokal dari folder utama proyek:
+```sh
+npm test
+```
+
+Suite menggunakan test runner bawaan Node.js, tanpa dependensi instalasi tambahan. Cakupannya meliputi konfigurasi grid, proyeksi dan hit-test 144 tile, koordinat tidak valid, pemilihan tile, render warna/stroke, HiDPI, zoom anchor, pan, batas zoom, normalisasi wheel pixel/line/page, resize, pointer capture, dan pembatalan drag.
+
+## Tes integrasi browser
+
+Jalankan server lokal:
 
 ```sh
 python -m http.server 8000
 ```
 
-Buka `http://localhost:8000/checks/`. Halaman menampilkan jumlah pengecekan yang lulus atau gagal beserta rincian setiap pengecekan. ES module memerlukan halaman yang dilayani melalui HTTP, bukan dibuka langsung sebagai `file://`.
+Buka `http://localhost:8000/checks/`. Halaman menjalankan pengecekan render canvas dan alur interaksi browser, termasuk kestabilan titik fokus ketika zoom, ukuran layout yang tetap, serta batas zoom. ES module perlu dilayani lewat HTTP; jangan membuka halaman langsung sebagai `file://`.
