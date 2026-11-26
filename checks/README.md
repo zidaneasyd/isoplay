@@ -1,5 +1,7 @@
 # Pengecekan aplikasi
 
+Jalankan suite otomatis dari folder utama proyek dengan `npm test`. Suite ini menggunakan test runner bawaan Node.js dan tidak memerlukan instalasi paket tambahan.
+
 `index.html` menjalankan pengecekan komponen dan integrasi plane di browser. Halaman ini menguji ukuran, proyeksi dan hit-test 144 tile, koordinat di luar plane, pemilihan tile, warna isi, stroke hover/aktif, serta alur pointer dan klik.
 
 Jalankan server lokal dari folder utama proyek:

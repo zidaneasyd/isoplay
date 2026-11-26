@@ -163,5 +163,6 @@ export function initializePlane() {
     }
   });
 
+  updateReadout();
   draw();
 }
