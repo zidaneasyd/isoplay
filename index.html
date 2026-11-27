@@ -8,6 +8,14 @@
 </head>
 <body>
   <canvas id="canvas" aria-label="Area kanvas"></canvas>
+  <section class="inspector" aria-label="Pengaturan bidang">
+    <div class="inspector-heading">
+      <h1>Ukuran bidang</h1>
+      <output id="grid-size-value" for="grid-size">9 × 9</output>
+    </div>
+    <input id="grid-size" type="range" min="9" max="63" step="2" value="9" aria-label="Ukuran bidang">
+    <div class="inspector-range" aria-hidden="true"><span>9 × 9</span><span>63 × 63</span></div>
+  </section>
   <script type="module" src="./src/js/main.js"></script>
 </body>
 </html>

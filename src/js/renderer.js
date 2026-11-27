@@ -1,16 +1,18 @@
 ﻿import { gridToScreen, tileW, tileH } from "./isometric.js";
 
-export function drawGrid(context, width, height, gridSize) {
+export function drawGrid(context, width, height, gridWidth, gridHeight = gridWidth) {
   const originX = width / 2;
   const originY = height / 2;
-  const gridCenter = (gridSize - 1) / 2;
+  // Cell coordinates are centered on the world origin; odd dimensions put (0, 0) on a cell.
+  const colCenter = (gridWidth - 1) / 2;
+  const rowCenter = (gridHeight - 1) / 2;
 
   // Draw from the far edge toward the near edge to keep tile borders tidy.
-  for (let diagonal = 0; diagonal <= (gridSize - 1) * 2; diagonal += 1) {
-    for (let col = 0; col < gridSize; col += 1) {
+  for (let diagonal = 0; diagonal <= gridWidth + gridHeight - 2; diagonal += 1) {
+    for (let col = 0; col < gridWidth; col += 1) {
       const row = diagonal - col;
-      if (row < 0 || row >= gridSize) continue;
-      const position = gridToScreen(col - gridCenter, row - gridCenter);
+      if (row < 0 || row >= gridHeight) continue;
+      const position = gridToScreen(col - colCenter, row - rowCenter);
       const tileX = originX + position.x;
       const tileY = originY + position.y;
 
@@ -28,11 +30,10 @@ export function drawGrid(context, width, height, gridSize) {
     }
   }
 
-  const axisExtent = gridSize / 2;
-  const colAxisStart = gridToScreen(-axisExtent, 0);
-  const colAxisEnd = gridToScreen(axisExtent, 0);
-  const rowAxisStart = gridToScreen(0, -axisExtent);
-  const rowAxisEnd = gridToScreen(0, axisExtent);
+  const colAxisStart = gridToScreen(-gridWidth / 2, 0);
+  const colAxisEnd = gridToScreen(gridWidth / 2, 0);
+  const rowAxisStart = gridToScreen(0, -gridHeight / 2);
+  const rowAxisEnd = gridToScreen(0, gridHeight / 2);
 
   context.beginPath();
   context.moveTo(originX + colAxisStart.x, originY + colAxisStart.y);
@@ -66,4 +67,10 @@ export function drawGrid(context, width, height, gridSize) {
   context.strokeStyle = "#22c55e";
   context.lineWidth = 1;
   context.stroke();
+
+  // Mark the world origin where the two grid axes meet.
+  context.beginPath();
+  context.arc(originX, originY, 3, 0, Math.PI * 2);
+  context.fillStyle = "#f5f5f5";
+  context.fill();
 }

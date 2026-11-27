@@ -9,12 +9,13 @@ test("drawGrid renders every tile and the grid axes", () => {
     moveTo() {},
     lineTo() {},
     closePath() {},
+    arc() {},
     fill() { calls.fills += 1; },
     stroke() { calls.strokes += 1; },
   };
 
   drawGrid(context, 640, 480, 4);
 
-  assert.equal(calls.fills, 16);
+  assert.equal(calls.fills, 17);
   assert.equal(calls.strokes, 20);
 });
