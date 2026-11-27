@@ -11,8 +11,8 @@ preventBrowserZoom();
 window.addEventListener("resize", resize);
 resize();
 
-startRenderLoop((dt) => {
+startRenderLoop(() => {
   const { width, height } = getSize();
   context.clearRect(0, 0, width, height);
-  drawGrid(context, width, height, gridSize, dt);
+  drawGrid(context, width, height, gridSize);
 });
