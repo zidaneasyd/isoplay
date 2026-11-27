@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { drawGrid } from "../src/js/renderer.js";
 
-test("drawGrid renders every tile and the grid axes", () => {
+test("drawGrid draws only grid lines, axes, and the origin marker", () => {
   const calls = { fills: 0, strokes: 0 };
   const context = {
     beginPath() {},
@@ -16,6 +16,6 @@ test("drawGrid renders every tile and the grid axes", () => {
 
   drawGrid(context, 640, 480, 4);
 
-  assert.equal(calls.fills, 17);
+  assert.equal(calls.fills, 1);
   assert.equal(calls.strokes, 20);
 });

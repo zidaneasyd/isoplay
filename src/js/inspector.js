@@ -1,5 +1,7 @@
-export function createInspector(sizeInput, sizeValue) {
+export function createInspector(sizeInput, sizeValue, axesInput, gridInput) {
   let gridSize = Number(sizeInput.value);
+  let showAxes = axesInput ? axesInput.checked : true;
+  let showGrid = gridInput ? gridInput.checked : true;
 
   function updateGridSize() {
     gridSize = Number(sizeInput.value);
@@ -8,7 +10,17 @@ export function createInspector(sizeInput, sizeValue) {
   }
 
   sizeInput.addEventListener("input", updateGridSize);
+  axesInput?.addEventListener("change", () => {
+    showAxes = axesInput.checked;
+  });
+  gridInput?.addEventListener("change", () => {
+    showGrid = gridInput.checked;
+  });
   updateGridSize();
 
-  return { getGridSize: () => gridSize };
+  return {
+    getGridSize: () => gridSize,
+    getShowAxes: () => axesInput ? axesInput.checked : showAxes,
+    getShowGrid: () => gridInput ? gridInput.checked : showGrid,
+  };
 }

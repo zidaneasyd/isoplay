@@ -1,34 +1,79 @@
-﻿import { gridToScreen, tileW, tileH } from "./isometric.js";
+import { gridToScreen, tileW, tileH } from "./isometric.js";
 
-export function drawGrid(context, width, height, gridWidth, gridHeight = gridWidth) {
+const elevationStep = tileH / 2;
+
+export function drawTile(context, centerX, centerY, color, strokeColor = null, strokeWidth = 1) {
+  context.beginPath();
+  context.moveTo(centerX, centerY - tileH / 2);
+  context.lineTo(centerX + tileW / 2, centerY);
+  context.lineTo(centerX, centerY + tileH / 2);
+  context.lineTo(centerX - tileW / 2, centerY);
+  context.closePath();
+  context.fillStyle = color;
+  context.fill();
+  if (strokeColor) {
+    context.strokeStyle = strokeColor;
+    context.lineWidth = strokeWidth;
+    context.stroke();
+  }
+}
+
+export function drawTiles(context, width, height, tiles, { alreadySorted = false } = {}) {
   const originX = width / 2;
   const originY = height / 2;
+  const sortedTiles = alreadySorted ? tiles : [...tiles].sort((a, b) =>
+    (a.col + a.row) - (b.col + b.row)
+    || a.height - b.height
+    || a.col - b.col
+    || a.row - b.row
+  );
+
+  for (const tile of sortedTiles) {
+    const position = gridToScreen(tile.col, tile.row);
+    drawTile(
+      context,
+      originX + position.x,
+      originY + position.y - tile.height * elevationStep,
+      tile.color ?? "#383838"
+    );
+  }
+}
+
+export function drawGrid(
+  context,
+  width,
+  height,
+  gridWidth,
+  gridHeight = gridWidth,
+  { showAxes = true, showGrid = true } = {}
+) {
   // Cell coordinates are centered on the world origin; odd dimensions put (0, 0) on a cell.
   const colCenter = (gridWidth - 1) / 2;
   const rowCenter = (gridHeight - 1) / 2;
+  const originX = width / 2;
+  const originY = height / 2;
 
-  // Draw from the far edge toward the near edge to keep tile borders tidy.
-  for (let diagonal = 0; diagonal <= gridWidth + gridHeight - 2; diagonal += 1) {
-    for (let col = 0; col < gridWidth; col += 1) {
-      const row = diagonal - col;
-      if (row < 0 || row >= gridHeight) continue;
-      const position = gridToScreen(col - colCenter, row - rowCenter);
-      const tileX = originX + position.x;
-      const tileY = originY + position.y;
-
-      context.beginPath();
-      context.moveTo(tileX, tileY - tileH / 2);
-      context.lineTo(tileX + tileW / 2, tileY);
-      context.lineTo(tileX, tileY + tileH / 2);
-      context.lineTo(tileX - tileW / 2, tileY);
-      context.closePath();
-      context.fillStyle = "#383838";
-      context.fill();
-      context.strokeStyle = "#484848";
-      context.lineWidth = 1;
-      context.stroke();
+  if (showGrid) {
+    // Grid lines are guides only; tile surfaces are drawn independently by drawTiles.
+    for (let row = 0; row < gridHeight; row += 1) {
+      for (let col = 0; col < gridWidth; col += 1) {
+        const position = gridToScreen(col - colCenter, row - rowCenter);
+        const tileX = originX + position.x;
+        const tileY = originY + position.y;
+        context.beginPath();
+        context.moveTo(tileX, tileY - tileH / 2);
+        context.lineTo(tileX + tileW / 2, tileY);
+        context.lineTo(tileX, tileY + tileH / 2);
+        context.lineTo(tileX - tileW / 2, tileY);
+        context.closePath();
+        context.strokeStyle = "#484848";
+        context.lineWidth = 1;
+        context.stroke();
+      }
     }
   }
+
+  if (!showAxes) return;
 
   const colAxisStart = gridToScreen(-gridWidth / 2, 0);
   const colAxisEnd = gridToScreen(gridWidth / 2, 0);

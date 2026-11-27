@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { drawGrid } from "../src/js/renderer.js";
+import { drawGrid, drawTiles } from "../src/js/renderer.js";
 import { tileH, tileW } from "../src/js/isometric.js";
 
 function createContext() {
@@ -24,7 +24,7 @@ test("drawGrid draws the requested cell count for multiple sizes", () => {
   for (const size of [1, 9, 31, 63]) {
     const { calls, context } = createContext();
     drawGrid(context, 800, 600, size);
-    assert.equal(calls.fills, size * size + 1, `${size}x${size} grid plus origin marker`);
+    assert.equal(calls.fills, 1, `${size}x${size} grid has no tile fills`);
     assert.equal(calls.strokes, size * size + 4, `${size}x${size} cell edges plus axes`);
   }
 });
@@ -47,7 +47,45 @@ test("drawGrid supports rectangular grids and places their center cell at canvas
   const centers = calls.cellPaths
     .map(([top, right]) => [right[0] - tileW / 2, top[1] + tileH / 2]);
 
-  assert.equal(calls.fills, 16);
+  assert.equal(calls.fills, 1);
   assert.equal(calls.strokes, 19);
   assert.ok(centers.some(([x, y]) => x === 400 && y === 300));
+});
+
+test("drawTiles paints solid diamonds from back to front by diagonal then height", () => {
+  const fills = [];
+  let center;
+  const context = {
+    beginPath() { center = null; },
+    moveTo(x, y) { center = [x, y + tileH / 2]; },
+    lineTo() {},
+    closePath() {},
+    fill() { fills.push({ center, color: context.fillStyle }); },
+  };
+
+  drawTiles(context, 400, 300, [
+    { col: 1, row: 0, height: 0, color: "front" },
+    { col: 0, row: 0, height: 1, color: "higher" },
+    { col: 0, row: 0, height: 0, color: "back" },
+  ]);
+
+  assert.deepEqual(fills.map(({ color }) => color), ["back", "higher", "front"]);
+  assert.deepEqual(fills[1].center, [200, 134]);
+});
+
+test("drawGrid hides axis guides and tile grid independently", () => {
+  const gridOnly = createContext();
+  drawGrid(gridOnly.context, 800, 600, 3, 3, { showAxes: false, showGrid: true });
+  assert.equal(gridOnly.calls.strokes, 3 * 3);
+  assert.equal(gridOnly.calls.fills, 0);
+
+  const axesOnly = createContext();
+  drawGrid(axesOnly.context, 800, 600, 3, 3, { showAxes: true, showGrid: false });
+  assert.equal(axesOnly.calls.strokes, 4);
+  assert.equal(axesOnly.calls.fills, 1);
+
+  const plain = createContext();
+  drawGrid(plain.context, 800, 600, 3, 3, { showAxes: false, showGrid: false });
+  assert.equal(plain.calls.strokes, 0);
+  assert.equal(plain.calls.fills, 0);
 });

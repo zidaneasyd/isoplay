@@ -8,6 +8,9 @@ body {
 }
 
 canvas {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
   display: block;
   width: 100vw;
   height: 100vh;
@@ -26,6 +29,7 @@ canvas {
   border-radius: 10px;
   box-shadow: 0 8px 28px rgb(0 0 0 / 30%);
   font: 14px sans-serif;
+  z-index: 1;
 }
 
 .inspector-heading,
@@ -88,4 +92,71 @@ canvas {
 .inspector-range {
   color: #999;
   font-size: 11px;
+}
+
+.inspector-toggles {
+  display: flex;
+  gap: 16px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid #414141;
+}
+
+.inspector-toggles label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #c5c5c5;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.inspector-toggles input {
+  accent-color: #a78bfa;
+  margin: 0;
+}
+
+.hover-card {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  box-sizing: border-box;
+  min-width: 176px;
+  padding: 14px 16px;
+  color: #e5e5e5;
+  background: rgb(34 34 34 / 92%);
+  border: 1px solid #414141;
+  border-radius: 10px;
+  box-shadow: 0 8px 28px rgb(0 0 0 / 30%);
+  font: 14px sans-serif;
+  z-index: 1;
+}
+
+.hover-card h2 {
+  margin: 0 0 10px;
+  color: #aaa;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.coordinate-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.coordinate-row + .coordinate-row {
+  margin-top: 8px;
+}
+
+.coordinate-row span {
+  color: #999;
+  font-size: 11px;
+}
+
+.hover-card output {
+  color: #fff;
+  font: 600 14px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
 }

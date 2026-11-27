@@ -34,3 +34,26 @@ test("inspector updates the grid size and output when the slider changes", () =>
     assert.equal(output.textContent, output.value);
   }
 });
+
+test("inspector exposes axis and grid visibility toggles", () => {
+  const input = createInput(9);
+  const output = {};
+  const axes = createInput("");
+  const grid = createInput("");
+  axes.checked = true;
+  grid.checked = true;
+  const inspector = createInspector(input, output, axes, grid);
+
+  assert.equal(inspector.getShowAxes(), true);
+  assert.equal(inspector.getShowGrid(), true);
+
+  axes.checked = false;
+  assert.equal(inspector.getShowAxes(), false, "visibility reads the live checkbox state");
+  axes.dispatch("change");
+  grid.checked = false;
+  assert.equal(inspector.getShowGrid(), false, "grid visibility reads the live checkbox state");
+  grid.dispatch("change");
+
+  assert.equal(inspector.getShowAxes(), false);
+  assert.equal(inspector.getShowGrid(), false);
+});
