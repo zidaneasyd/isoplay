@@ -88,7 +88,7 @@ test("application startup wires resize, grid input, and render loop", async () =
 
     frames.shift()(1000);
     assert.deepEqual(calls.clears[0], [0, 0, 800, 600]);
-    assert.equal(calls.fills, 9 * 9 + 1);
+    assert.equal(calls.fills, 3, "base tile fills are batched, with the origin marker");
 
     fireCanvas("pointermove", { clientX: 400, clientY: 300 });
     frames.shift()(1008);
@@ -98,7 +98,7 @@ test("application startup wires resize, grid input, and render loop", async () =
     axesToggle.checked = false;
     const strokesBeforeAxesToggle = calls.strokes;
     frames.shift()(1016);
-    assert.equal(calls.strokes - strokesBeforeAxesToggle, 9 * 9 + 1, "grid remains while axes are hidden");
+    assert.equal(calls.strokes - strokesBeforeAxesToggle, 3, "visible tile outlines are batched while axes are hidden");
     assert.equal(calls.strokeStyles.at(-1), "rgba(255, 184, 138, 0.5)");
 
     gridToggle.checked = false;
@@ -159,7 +159,7 @@ test("application startup wires resize, grid input, and render loop", async () =
     const fillsBeforeResizeFrame = calls.fills;
     frames.shift()(1056);
     assert.deepEqual(calls.clears[9], [0, 0, 1024, 768]);
-    assert.equal(calls.fills - fillsBeforeResizeFrame, 11 * 11 + 1, "single selection remains visible in normal mode");
+    assert.equal(calls.fills - fillsBeforeResizeFrame, 3, "base tile fills are batched with the selected tile");
   } finally {
     if (originalDocument === undefined) delete globalThis.document;
     else globalThis.document = originalDocument;

@@ -1,7 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { drawGrid, drawTiles } from "../src/js/renderer.js";
+import { drawGrid, drawTiles, getVisibleTileBounds } from "../src/js/renderer.js";
 import { tileH, tileW } from "../src/js/isometric.js";
+import { createCamera } from "../src/js/camera.js";
+import { createGridTiles } from "../src/js/grid-model.js";
 
 function createContext() {
   const calls = { fills: 0, strokes: 0, paths: [], cellPaths: [], currentPath: [] };
@@ -12,7 +14,7 @@ function createContext() {
     },
     moveTo(x, y) { calls.currentPath.push([x, y]); },
     lineTo(x, y) { calls.currentPath.push([x, y]); },
-    closePath() { calls.cellPaths.push([...calls.currentPath]); },
+    closePath() { calls.cellPaths.push(calls.currentPath.slice(-4)); },
     arc() {},
     fill() { calls.fills += 1; },
     stroke() { calls.strokes += 1; },
@@ -119,4 +121,17 @@ test("drawGrid scales stroke width inversely to camera zoom", () => {
 
   assert.equal(widths.length, 3 * 3 + 4);
   assert.ok(widths.every((width) => width === 0.5));
+});
+
+test("drawTiles culls 100x100 tiles outside a zoomed viewport", () => {
+  const camera = createCamera();
+  const bounds = getVisibleTileBounds(camera, 800, 600);
+  const { context } = createContext();
+  const rendered = drawTiles(context, 800, 600, createGridTiles(100), {
+    alreadySorted: true,
+    bounds,
+  });
+
+  assert.ok(rendered > 0);
+  assert.ok(rendered < 100 * 100);
 });

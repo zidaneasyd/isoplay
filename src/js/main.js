@@ -2,7 +2,7 @@ import { createCanvas } from "./canvas.js";
 import { attachCameraControls, createCamera } from "./camera.js?v=camera-1";
 import { startRenderLoop } from "./animation.js";
 import { preventBrowserZoom } from "./browser-controls.js";
-import { drawGrid, drawTile, drawTiles } from "./renderer.js";
+import { drawGrid, drawTile, drawTiles, getVisibleTileBounds, isTileInBounds } from "./renderer.js";
 import { gridToScreen, tileH } from "./isometric.js";
 import { createInspector } from "./inspector.js?v=camera-1";
 import { createGridTiles } from "./grid-model.js";
@@ -26,6 +26,12 @@ const panel = createTileInfoPanel(
   document.getElementById("hover-coordinates"),
   document.getElementById("active-coordinates")
 );
+const renderStats = {
+  tiles: document.getElementById("rendered-tiles"),
+  gridCells: document.getElementById("rendered-grid-cells"),
+  fps: document.getElementById("render-fps"),
+  time: document.getElementById("render-time"),
+};
 const camera = createCamera();
 const interaction = attachTileInteraction(canvas, {
   getCanvasSize: getSize,
@@ -66,9 +72,15 @@ resizeCanvas();
 
 let cachedGridSize = null;
 let gridTiles = [];
-startRenderLoop(() => {
+let fpsElapsed = 0;
+let fpsFrames = 0;
+let measuredFps = null;
+startRenderLoop((dt) => {
+  const renderStartedAt = performance.now();
   const { width, height } = getSize();
   const gridSize = inspector.getGridSize();
+  const showGrid = inspector.getShowGrid();
+  const visibleBounds = getVisibleTileBounds(camera, width, height);
   const strokeScale = 1 / camera.getState().zoom;
   if (gridSize !== cachedGridSize) {
     cachedGridSize = gridSize;
@@ -79,11 +91,18 @@ startRenderLoop(() => {
   context.clearRect(0, 0, width, height);
   context.save();
   camera.applyToContext(context, width, height);
-  drawTiles(context, width, height, gridTiles, { alreadySorted: true });
+  let renderedTiles = drawTiles(context, width, height, gridTiles, {
+    alreadySorted: true,
+    bounds: visibleBounds,
+    strokeColor: showGrid ? "#484848" : null,
+    strokeWidth: strokeScale,
+  });
+  const renderedGridCells = showGrid ? renderedTiles : 0;
   drawGrid(context, width, height, gridSize, gridSize, {
     showAxes: inspector.getShowAxes(),
-    showGrid: inspector.getShowGrid(),
+    showGrid: false,
     strokeScale,
+    bounds: visibleBounds,
   });
 
   const hoveredTile = interaction.getHoveredTile();
@@ -97,9 +116,11 @@ startRenderLoop(() => {
       "rgba(255, 184, 138, 0.5)",
       2 * strokeScale
     );
+    renderedTiles += 1;
   }
 
   for (const tile of selection.getTiles()) {
+    if (!isTileInBounds(tile, visibleBounds)) continue;
     const position = gridToScreen(tile.col, tile.row);
     drawTile(
       context,
@@ -109,6 +130,28 @@ startRenderLoop(() => {
       "rgba(211, 198, 255, 0.5)",
       2 * strokeScale
     );
+    renderedTiles += 1;
   }
   context.restore();
+
+  const renderDuration = performance.now() - renderStartedAt;
+  if (dt > 0) {
+    fpsElapsed += dt;
+    fpsFrames += 1;
+    if (fpsElapsed >= 0.5) {
+      measuredFps = Math.round(fpsFrames / fpsElapsed);
+      fpsElapsed = 0;
+      fpsFrames = 0;
+    }
+  }
+  if (renderStats.tiles) {
+    renderStats.tiles.textContent = String(renderedTiles);
+  }
+  if (renderStats.gridCells) {
+    renderStats.gridCells.textContent = String(renderedGridCells);
+  }
+  if (renderStats.fps) {
+    renderStats.fps.textContent = measuredFps === null ? "—" : String(measuredFps);
+  }
+  if (renderStats.time) renderStats.time.textContent = `${renderDuration.toFixed(2)} ms`;
 });

@@ -13,8 +13,8 @@
       <h1>Ukuran bidang</h1>
       <output id="grid-size-value" for="grid-size">9 × 9</output>
     </div>
-    <input id="grid-size" type="range" min="9" max="63" step="2" value="9" aria-label="Ukuran bidang">
-    <div class="inspector-range" aria-hidden="true"><span>9 × 9</span><span>63 × 63</span></div>
+    <input id="grid-size" type="range" min="9" max="100" step="1" value="9" aria-label="Ukuran bidang">
+    <div class="inspector-range" aria-hidden="true"><span>9 × 9</span><span>100 × 100</span></div>
     <div class="inspector-toggles">
       <label><input id="show-axes" type="checkbox" checked> <span>Sumbu</span></label>
       <label><input id="show-grid" type="checkbox" checked> <span>Grid</span></label>
@@ -24,10 +24,15 @@
     </div>
     <p class="inspector-help">Scroll: zoom · Klik tengah + geser: pan</p>
   </section>
-  <section class="hover-card" aria-label="Koordinat tile yang diarahkan">
+  <section class="hover-card" aria-label="Koordinat tile dan statistik render">
     <h2>Koordinat tile</h2>
     <div class="coordinate-row"><span>Hover</span><output id="hover-coordinates" aria-live="polite">—</output></div>
     <div class="coordinate-row"><span>Tile aktif</span><output id="active-coordinates" aria-live="polite">0 tile aktif</output></div>
+    <h2 class="stats-heading">Performa</h2>
+    <div class="coordinate-row"><span>Tile digambar</span><output id="rendered-tiles">—</output></div>
+    <div class="coordinate-row"><span>Sel grid</span><output id="rendered-grid-cells">—</output></div>
+    <div class="coordinate-row"><span>FPS</span><output id="render-fps">—</output></div>
+    <div class="coordinate-row"><span>Waktu render</span><output id="render-time">—</output></div>
   </section>
   <script type="module" src="./src/js/main.js?v=camera-1"></script>
 </body>
