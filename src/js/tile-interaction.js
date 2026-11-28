@@ -82,12 +82,12 @@ export function attachTileInteraction(canvas, {
   }
 
   function applySelection(tile, mode) {
-    if (mode === "add") selection.add(tile);
-    else selection.remove(tile);
+    if (mode === "add") return selection.add(tile);
+    return selection.remove(tile);
   }
 
   function updateSelection(mode) {
-    applySelection(tileAtPointer(), mode);
+    if (!applySelection(tileAtPointer(), mode)) return;
     onSelectionChange(selection.getTiles());
   }
 
@@ -98,8 +98,12 @@ export function attachTileInteraction(canvas, {
       return;
     }
     const path = lastDragTile ? tilesOnLine(lastDragTile, tile) : [tile];
-    for (const pathTile of path) applySelection(pathTile, mode);
+    let changed = false;
+    for (const pathTile of path) {
+      if (applySelection(pathTile, mode)) changed = true;
+    }
     lastDragTile = tile;
+    if (!changed) return;
     onSelectionChange(selection.getTiles());
   }
 
@@ -127,7 +131,7 @@ export function attachTileInteraction(canvas, {
       if (event.button === 2 && !getMultiSelect()) return;
 
       if (event.button === 0 && !getMultiSelect()) {
-        selection.selectOnly(tileAtPointer());
+        if (!selection.selectOnly(tileAtPointer())) return;
         onSelectionChange(selection.getTiles());
         return;
       }

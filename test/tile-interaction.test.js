@@ -176,6 +176,21 @@ test("hover changes notify once per tile rather than once per pointer event", ()
   assert.deepEqual(hovers.at(-1), { col: 1, row: 0, height: 0 });
 });
 
+test("selection callbacks fire only when selection contents actually change", () => {
+  const canvas = makeCanvas();
+  const changes = [];
+  attachTileInteraction(canvas, {
+    getCanvasSize: () => ({ width: 800, height: 600 }),
+    getGridSize: () => 9,
+    selection: createSelectionModel(),
+    onSelectionChange: (tiles) => changes.push(tiles.length),
+  });
+
+  canvas.listeners.get("pointerdown")(event(410, 320, { button: 0 }));
+  canvas.listeners.get("pointerdown")(event(410, 320, { button: 0 }));
+  assert.deepEqual(changes, [1]);
+});
+
 test("tile picking follows camera pan and zoom transforms", () => {
   const canvas = makeCanvas();
   const camera = createCamera();

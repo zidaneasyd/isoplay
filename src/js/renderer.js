@@ -122,6 +122,90 @@ export function drawTileBatch(context, width, height, tiles, {
   return count;
 }
 
+function createTileBatchGeometry(width, height, tiles, bounds, PathClass) {
+  if (typeof PathClass !== "function") {
+    throw new Error("Path2D is required to cache tile batch geometry");
+  }
+  const fillPath = new PathClass();
+  const strokePath = new PathClass();
+  const edges = new Map();
+  let count = 0;
+
+  function addEdge(from, to) {
+    const fromKey = `${from.x},${from.y}`;
+    const toKey = `${to.x},${to.y}`;
+    const key = fromKey < toKey ? `${fromKey}|${toKey}` : `${toKey}|${fromKey}`;
+    if (!edges.has(key)) edges.set(key, [from, to]);
+  }
+
+  for (const tile of tiles) {
+    if (!isTileInBounds(tile, bounds)) continue;
+    const position = gridToScreen(tile.col, tile.row);
+    const centerX = width / 2 + position.x;
+    const centerY = height / 2 + position.y - (tile.height ?? 0) * elevationStep;
+    const corners = [
+      { x: centerX, y: centerY - tileH / 2 },
+      { x: centerX + tileW / 2, y: centerY },
+      { x: centerX, y: centerY + tileH / 2 },
+      { x: centerX - tileW / 2, y: centerY },
+    ];
+    fillPath.moveTo(corners[0].x, corners[0].y);
+    for (let index = 1; index < corners.length; index += 1) {
+      fillPath.lineTo(corners[index].x, corners[index].y);
+    }
+    fillPath.closePath();
+    for (let index = 0; index < corners.length; index += 1) {
+      addEdge(corners[index], corners[(index + 1) % corners.length]);
+    }
+    count += 1;
+  }
+
+  for (const [from, to] of edges.values()) {
+    strokePath.moveTo(from.x, from.y);
+    strokePath.lineTo(to.x, to.y);
+  }
+  return { fillPath, strokePath, count };
+}
+
+export function createTileBatchCache(PathClass = globalThis.Path2D) {
+  let cachedKey = null;
+  let cachedGeometry = null;
+  let buildCount = 0;
+
+  return {
+    get(revision, width, height, tiles, { bounds = null } = {}) {
+      const boundsKey = bounds ? [
+        bounds.minCol, bounds.maxCol, bounds.minRow, bounds.maxRow,
+        bounds.width, bounds.height, bounds.zoom, bounds.offsetX, bounds.offsetY,
+      ] : null;
+      const key = JSON.stringify([revision, width, height, boundsKey]);
+      if (key !== cachedKey) {
+        cachedGeometry = createTileBatchGeometry(width, height, tiles, bounds, PathClass);
+        cachedKey = key;
+        buildCount += 1;
+      }
+      return cachedGeometry;
+    },
+    getBuildCount: () => buildCount,
+  };
+}
+
+export function drawCachedTileBatch(context, geometry, {
+  fillColor,
+  strokeColor = null,
+  strokeWidth = 1,
+} = {}) {
+  if (!geometry || geometry.count === 0) return 0;
+  context.fillStyle = fillColor;
+  context.fill(geometry.fillPath);
+  if (strokeColor) {
+    context.strokeStyle = strokeColor;
+    context.lineWidth = strokeWidth;
+    context.stroke(geometry.strokePath);
+  }
+  return geometry.count;
+}
+
 export function getVisibleTileBounds(camera, width, height) {
   const corners = [
     { x: 0, y: 0 },

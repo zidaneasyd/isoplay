@@ -1,6 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createBoardGeometry, drawBoard, drawTileBatch, getVisibleTileBounds } from "../src/js/renderer.js";
+import {
+  createBoardGeometry,
+  createTileBatchCache,
+  drawBoard,
+  drawCachedTileBatch,
+  drawTileBatch,
+  getVisibleTileBounds,
+} from "../src/js/renderer.js";
 import { createCamera } from "../src/js/camera.js";
 
 class FakePath {
@@ -72,6 +79,25 @@ test("selection outlines stroke a shared edge between adjacent tiles only once",
   assert.equal(count, 2);
   const stroke = context.calls.findLast(([name]) => name === "stroke");
   assert.equal(stroke[4], 7, "two adjacent diamonds have seven unique edges, not eight");
+});
+
+test("selection geometry cache reuses paths until selection or viewport changes", () => {
+  const cache = createTileBatchCache(FakePath);
+  const selected = [{ col: 0, row: 0 }, { col: 1, row: 0 }];
+  const first = cache.get(4, 800, 600, selected);
+  const repeated = cache.get(4, 800, 600, selected);
+  assert.strictEqual(repeated, first);
+  assert.equal(cache.getBuildCount(), 1);
+
+  const context = contextMock();
+  drawCachedTileBatch(context, repeated, { fillColor: "purple", strokeColor: "white" });
+  drawCachedTileBatch(context, repeated, { fillColor: "purple", strokeColor: "white" });
+  assert.equal(context.calls.filter(([name]) => name === "fill").length, 2);
+  assert.equal(context.calls.filter(([name]) => name === "stroke").length, 2);
+
+  cache.get(5, 800, 600, selected);
+  cache.get(5, 1024, 768, selected);
+  assert.equal(cache.getBuildCount(), 3, "selection revision and viewport changes rebuild the path");
 });
 
 test("drawTileBatch handles missing heights and skips painting when all tiles are culled", () => {

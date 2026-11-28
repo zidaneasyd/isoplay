@@ -4,7 +4,9 @@ import { createRenderScheduler } from "./animation.js?v=render-2";
 import { preventBrowserZoom } from "./browser-controls.js";
 import {
   createBoardGeometry,
+  createTileBatchCache,
   drawBoard,
+  drawCachedTileBatch,
   drawGrid,
   drawTile,
   drawTileBatch,
@@ -31,6 +33,7 @@ const multiSelectInput = document.getElementById("multi-select");
 const sandboxModeInput = document.getElementById("sandbox-mode");
 const inspector = createInspector(sizeInput, sizeValue, axesInput, gridInput, multiSelectInput);
 const selection = createSelectionModel();
+const selectionGeometryCache = createTileBatchCache();
 const panel = createTileInfoPanel(
   document.getElementById("hover-coordinates"),
   document.getElementById("active-coordinates")
@@ -136,19 +139,8 @@ function renderFrame(dt) {
   }
 
   const hoveredTile = interaction.getHoveredTile();
-  let selectedHeight;
-  let hasSelectedTiles = false;
-  let canBatchSelection = true;
-  let hoveredTileIsSelected = false;
-  for (const tile of selection.values()) {
-    const height = tile.height ?? 0;
-    if (!hasSelectedTiles) {
-      selectedHeight = height;
-      hasSelectedTiles = true;
-    } else if (selectedHeight !== height) canBatchSelection = false;
-    if (hoveredTile && tile.col === hoveredTile.col && tile.row === hoveredTile.row
-      && height === (hoveredTile.height ?? 0)) hoveredTileIsSelected = true;
-  }
+  const canBatchSelection = selection.hasUniformHeight();
+  const hoveredTileIsSelected = selection.has(hoveredTile);
 
   if (hoveredTile && !hoveredTileIsSelected) {
     const position = gridToScreen(hoveredTile.col, hoveredTile.row);
@@ -164,12 +156,22 @@ function renderFrame(dt) {
   }
 
   if (canBatchSelection) {
-    renderedTiles += drawTileBatch(context, width, height, selection.values(), {
-      bounds: visibleBounds,
+    const selectionStyle = {
       fillColor: "rgba(153, 132, 194, 0.5)",
       strokeColor: "rgba(211, 198, 255, 0.5)",
       strokeWidth: 2 * strokeScale,
-    });
+    };
+    if (typeof globalThis.Path2D === "function") {
+      const geometry = selectionGeometryCache.get(
+        selection.getRevision(), width, height, selection.values(), { bounds: visibleBounds }
+      );
+      renderedTiles += drawCachedTileBatch(context, geometry, selectionStyle);
+    } else {
+      renderedTiles += drawTileBatch(context, width, height, selection.values(), {
+        bounds: visibleBounds,
+        ...selectionStyle,
+      });
+    }
   } else {
     for (const tile of selection.values()) {
       if (!isTileInBounds(tile, visibleBounds)) continue;
