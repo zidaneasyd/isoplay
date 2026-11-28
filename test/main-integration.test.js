@@ -112,7 +112,7 @@ test("application startup wires resize, grid input, and render loop", async () =
     axesToggle.dispatch("change");
     const strokesBeforeAxesToggle = calls.strokes;
     frames.shift()(1016);
-    assert.equal(calls.strokes - strokesBeforeAxesToggle, 3, "visible tile outlines are batched while axes are hidden");
+    assert.equal(calls.strokes - strokesBeforeAxesToggle, 2, "unique grid edges and the hover outline are each stroked once");
     assert.equal(calls.strokeStyles.at(-1), "rgba(255, 184, 138, 0.5)");
 
     gridToggle.checked = false;

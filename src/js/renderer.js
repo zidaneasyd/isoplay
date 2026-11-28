@@ -158,28 +158,48 @@ export function drawGrid(
   let renderedGridCells = 0;
 
   if (showGrid) {
-    // Grid lines are guides only; tile surfaces are drawn independently by drawTiles.
     const firstRow = bounds ? Math.max(0, Math.ceil(bounds.minRow + rowCenter)) : 0;
     const lastRow = bounds ? Math.min(gridHeight - 1, Math.floor(bounds.maxRow + rowCenter)) : gridHeight - 1;
     const firstCol = bounds ? Math.max(0, Math.ceil(bounds.minCol + colCenter)) : 0;
     const lastCol = bounds ? Math.min(gridWidth - 1, Math.floor(bounds.maxCol + colCenter)) : gridWidth - 1;
+    const edges = new Map();
+
+    function addEdge(from, to) {
+      const fromKey = `${from.x},${from.y}`;
+      const toKey = `${to.x},${to.y}`;
+      const key = fromKey < toKey ? `${fromKey}|${toKey}` : `${toKey}|${fromKey}`;
+      if (!edges.has(key)) edges.set(key, [from, to]);
+    }
+
     for (let row = firstRow; row <= lastRow; row += 1) {
       for (let col = firstCol; col <= lastCol; col += 1) {
-        if (!isTileInBounds({ col: col - colCenter, row: row - rowCenter }, bounds)) continue;
-        const position = gridToScreen(col - colCenter, row - rowCenter);
+        const tile = { col: col - colCenter, row: row - rowCenter };
+        if (!isTileInBounds(tile, bounds)) continue;
+        const position = gridToScreen(tile.col, tile.row);
         const tileX = originX + position.x;
         const tileY = originY + position.y;
-        context.beginPath();
-        context.moveTo(tileX, tileY - tileH / 2);
-        context.lineTo(tileX + tileW / 2, tileY);
-        context.lineTo(tileX, tileY + tileH / 2);
-        context.lineTo(tileX - tileW / 2, tileY);
-        context.closePath();
-        context.strokeStyle = "#484848";
-        context.lineWidth = strokeScale;
-        context.stroke();
+        const corners = [
+          { x: tileX, y: tileY - tileH / 2 },
+          { x: tileX + tileW / 2, y: tileY },
+          { x: tileX, y: tileY + tileH / 2 },
+          { x: tileX - tileW / 2, y: tileY },
+        ];
+        for (let corner = 0; corner < corners.length; corner += 1) {
+          addEdge(corners[corner], corners[(corner + 1) % corners.length]);
+        }
         renderedGridCells += 1;
       }
+    }
+
+    if (edges.size > 0) {
+      context.beginPath();
+      for (const [from, to] of edges.values()) {
+        context.moveTo(from.x, from.y);
+        context.lineTo(to.x, to.y);
+      }
+      context.strokeStyle = "#484848";
+      context.lineWidth = strokeScale;
+      context.stroke();
     }
   }
 

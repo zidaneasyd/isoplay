@@ -17,5 +17,5 @@ test("drawGrid draws only grid lines, axes, and the origin marker", () => {
   drawGrid(context, 640, 480, 4);
 
   assert.equal(calls.fills, 1);
-  assert.equal(calls.strokes, 20);
+  assert.equal(calls.strokes, 5);
 });

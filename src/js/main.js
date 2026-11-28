@@ -97,13 +97,10 @@ function renderFrame(dt) {
   let renderedTiles = drawTiles(context, width, height, gridTiles, {
     alreadySorted: true,
     bounds: visibleBounds,
-    strokeColor: showGrid ? "#484848" : null,
-    strokeWidth: strokeScale,
   });
-  const renderedGridCells = showGrid ? renderedTiles : 0;
-  drawGrid(context, width, height, gridSize, gridSize, {
+  const renderedGridCells = drawGrid(context, width, height, gridSize, gridSize, {
     showAxes: inspector.getShowAxes(),
-    showGrid: false,
+    showGrid,
     strokeScale,
     bounds: visibleBounds,
   });
