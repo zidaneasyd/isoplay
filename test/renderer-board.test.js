@@ -6,9 +6,12 @@ import {
   drawBoard,
   drawCachedTileBatch,
   drawTileBatch,
+  drawTiles,
+  countVisibleGridTiles,
   getVisibleTileBounds,
 } from "../src/js/renderer.js";
 import { createCamera } from "../src/js/camera.js";
+import { createGridTiles } from "../src/js/grid-model.js";
 
 class FakePath {
   constructor() { this.commands = []; }
@@ -109,4 +112,16 @@ test("drawTileBatch handles missing heights and skips painting when all tiles ar
   const empty = contextMock();
   assert.equal(drawTileBatch(empty, 800, 600, [{ col: 500, row: 500 }], { bounds, fillColor: "x" }), 0);
   assert.equal(empty.calls.some(([name]) => name === "fill"), false);
+});
+
+test("visible tile count matches the generic renderer's viewport culling", () => {
+  const camera = createCamera();
+  const bounds = getVisibleTileBounds(camera, 800, 600);
+  const gridSize = 99;
+  const visible = countVisibleGridTiles(gridSize, gridSize, bounds);
+  assert.ok(visible > 0);
+  assert.ok(visible < gridSize * gridSize);
+  const context = contextMock();
+  const rendered = drawTiles(context, 800, 600, createGridTiles(gridSize), { alreadySorted: true, bounds });
+  assert.equal(visible, rendered);
 });

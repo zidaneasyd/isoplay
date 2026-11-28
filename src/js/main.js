@@ -11,6 +11,7 @@ import {
   drawTile,
   drawTileBatch,
   drawTiles,
+  countVisibleGridTiles,
   getVisibleTileBounds,
   isTileInBounds,
 } from "./renderer.js?v=render-2";
@@ -40,6 +41,7 @@ const panel = createTileInfoPanel(
 );
 const renderStats = createRenderStats({
   tiles: document.getElementById("rendered-tiles"),
+  visibleTiles: document.getElementById("visible-tiles"),
   gridLines: document.getElementById("rendered-grid-lines"),
   fps: document.getElementById("render-fps"),
   time: document.getElementById("render-time"),
@@ -88,6 +90,21 @@ attachCameraControls(canvas, {
 let cachedGridSize = null;
 let gridTiles = [];
 let boardGeometry = null;
+let visibleTileCountKey = null;
+let visibleTileCount = 0;
+
+function getVisibleGridTileCount(gridSize, bounds) {
+  const key = JSON.stringify([
+    gridSize, bounds.minCol, bounds.maxCol, bounds.minRow, bounds.maxRow,
+    bounds.width, bounds.height, bounds.zoom, bounds.offsetX, bounds.offsetY,
+  ]);
+  if (key !== visibleTileCountKey) {
+    visibleTileCount = countVisibleGridTiles(gridSize, gridSize, bounds);
+    visibleTileCountKey = key;
+  }
+  return visibleTileCount;
+}
+
 function renderFrame(dt) {
   if (sandbox.isActive()) sandbox.update(dt);
   const renderStartedAt = performance.now();
@@ -107,6 +124,7 @@ function renderFrame(dt) {
   context.save();
   camera.applyToContext(context, width, height);
   let renderedTiles;
+  let visibleTiles;
   let renderedGridLines = 0;
   const flatBoardColor = gridTiles.length > 0 ? (gridTiles[0].color ?? "#383838") : null;
   const canDrawBoard = boardGeometry !== null && flatBoardColor !== null
@@ -118,6 +136,7 @@ function renderFrame(dt) {
       strokeWidth: strokeScale,
     });
     renderedTiles = gridTiles.length;
+    visibleTiles = getVisibleGridTileCount(gridSize, visibleBounds);
     renderedGridLines = showGrid ? boardGeometry.lineCount : 0;
     drawGrid(context, width, height, gridSize, gridSize, {
       showAxes: inspector.getShowAxes(),
@@ -129,6 +148,7 @@ function renderFrame(dt) {
       alreadySorted: true,
       bounds: visibleBounds,
     });
+    visibleTiles = renderedTiles;
     drawGrid(context, width, height, gridSize, gridSize, {
       showAxes: inspector.getShowAxes(),
       showGrid,
@@ -191,6 +211,7 @@ function renderFrame(dt) {
 
   renderStats.record({
     tiles: renderedTiles,
+    visibleTiles,
     gridLines: renderedGridLines,
     renderMs: performance.now() - renderStartedAt,
   });

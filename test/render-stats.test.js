@@ -8,7 +8,7 @@ function setup(options = {}) {
   const timers = new Map();
   const writes = [];
   const outputs = {};
-  for (const key of ["tiles", "gridLines", "fps", "time"]) {
+  for (const key of ["tiles", "visibleTiles", "gridLines", "fps", "time"]) {
     outputs[key] = { set textContent(value) { writes.push([key, value]); this.value = value; } };
   }
   const stats = createRenderStats(outputs, {
@@ -32,7 +32,7 @@ function setup(options = {}) {
   };
 }
 
-const frame = (renderMs = 0.5) => ({ tiles: 3, gridLines: 20, renderMs });
+const frame = (renderMs = 0.5) => ({ tiles: 3, visibleTiles: 2, gridLines: 20, renderMs });
 
 test("stats skip timers when no output elements exist", () => {
   const timers = [];
@@ -53,7 +53,7 @@ test("stats coalesce frame writes and avoid unchanged DOM values", () => {
 
   env.fireTimer();
   assert.deepEqual(env.writes.filter(([key]) => key !== "fps"), [
-    ["tiles", "3"], ["gridLines", "20"], ["time", "0.50 ms"],
+    ["tiles", "3"], ["visibleTiles", "2"], ["gridLines", "20"], ["time", "0.50 ms"],
   ]);
   const writeCount = env.writes.length;
   env.stats.record(frame());

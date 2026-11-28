@@ -261,6 +261,23 @@ export function isTileInBounds(tile, bounds) {
     && diagonalDifference - diagonalExtent <= bounds.width;
 }
 
+export function countVisibleGridTiles(gridWidth, gridHeight = gridWidth, bounds = null) {
+  const colCenter = (gridWidth - 1) / 2;
+  const rowCenter = (gridHeight - 1) / 2;
+  const firstRow = bounds ? Math.max(0, Math.ceil(bounds.minRow + rowCenter)) : 0;
+  const lastRow = bounds ? Math.min(gridHeight - 1, Math.floor(bounds.maxRow + rowCenter)) : gridHeight - 1;
+  const firstCol = bounds ? Math.max(0, Math.ceil(bounds.minCol + colCenter)) : 0;
+  const lastCol = bounds ? Math.min(gridWidth - 1, Math.floor(bounds.maxCol + colCenter)) : gridWidth - 1;
+  let count = 0;
+
+  for (let row = firstRow; row <= lastRow; row += 1) {
+    for (let col = firstCol; col <= lastCol; col += 1) {
+      if (isTileInBounds({ col: col - colCenter, row: row - rowCenter }, bounds)) count += 1;
+    }
+  }
+  return count;
+}
+
 export function drawTiles(context, width, height, tiles, {
   alreadySorted = false,
   bounds = null,
