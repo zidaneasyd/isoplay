@@ -52,7 +52,7 @@ export function attachTileInteraction(canvas, {
   getCanvasSize,
   getGridSize,
   camera = { screenToWorld: (point) => point },
-  getMultiSelect = () => false,
+  getMultiSelect = () => true,
   selection,
   onHover = () => {},
   onSelectionChange = () => {},
@@ -69,7 +69,7 @@ export function attachTileInteraction(canvas, {
   }
 
   function updateHover() {
-    const nextTile = tileAtPointer();
+    const nextTile = getMultiSelect() ? tileAtPointer() : null;
     const unchanged = sameTile(hoveredTile, nextTile);
     hoveredTile = nextTile;
     if (unchanged) return;
@@ -127,6 +127,7 @@ export function attachTileInteraction(canvas, {
     pointerdown(event) {
       pointer = canvasPoint(event);
       updateHover();
+      if (!getMultiSelect()) return;
 
       if (event.button === 2 && !getMultiSelect()) return;
 

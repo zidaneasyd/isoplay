@@ -23,6 +23,7 @@ import { createSelectionModel } from "./selection-model.js";
 import { attachTileInteraction } from "./tile-interaction.js?v=camera-1";
 import { createTileInfoPanel } from "./tile-info-panel.js";
 import { createSandbox } from "./sandbox.js";
+import { attachInspectorControls } from "./ui-controls.js";
 
 const canvas = document.getElementById("canvas");
 const { context, getSize, resize } = createCanvas(canvas);
@@ -30,9 +31,21 @@ const sizeInput = document.getElementById("grid-size");
 const sizeValue = document.getElementById("grid-size-value");
 const axesInput = document.getElementById("show-axes");
 const gridInput = document.getElementById("show-grid");
-const multiSelectInput = document.getElementById("multi-select");
+const multiSelectInput = document.getElementById("tile-selection") ?? document.getElementById("multi-select");
 const sandboxModeInput = document.getElementById("sandbox-mode");
+const resetCameraButton = document.getElementById("reset-camera");
 const inspector = createInspector(sizeInput, sizeValue, axesInput, gridInput, multiSelectInput);
+attachInspectorControls({
+  panel: document.getElementById("left-panel"),
+  panelToggle: document.getElementById("panel-toggle"),
+  worldToggle: document.getElementById("world-toggle"),
+  worldInspectors: document.getElementById("world-inspectors"),
+  stepper: document.getElementById("size-stepper"),
+  decrementButton: document.getElementById("size-dec"),
+  incrementButton: document.getElementById("size-inc"),
+  sizeInput,
+  sizeLabel: document.getElementById("size-label"),
+});
 const selection = createSelectionModel();
 const selectionGeometryCache = createTileBatchCache();
 const panel = createTileInfoPanel(
@@ -71,6 +84,7 @@ function updateSelectionMode() {
     selection.clear();
     panel.showActive(selection.getTiles());
   }
+  interaction.refreshHover();
   requestRender();
 }
 
@@ -85,6 +99,12 @@ attachCameraControls(canvas, {
     requestRender();
   },
   getDefaultCursor: () => inspector.getMultiSelect() ? "crosshair" : "",
+});
+
+resetCameraButton?.addEventListener("click", () => {
+  camera.reset();
+  interaction.refreshHover();
+  requestRender();
 });
 
 let cachedGridSize = null;

@@ -71,7 +71,7 @@ test("multi-select mode adds by left drag, erases by right drag, and preserves h
   assert.equal(canvas.listeners.size, 0);
 });
 
-test("right click only removes selection while multi-select mode is active", () => {
+test("disabling tile selection blocks hover and every selection gesture", () => {
   const canvas = makeCanvas();
   const selection = createSelectionModel();
   let multiSelect = false;
@@ -85,11 +85,13 @@ test("right click only removes selection while multi-select mode is active", () 
 
   fire("pointerdown", event(410, 320, { button: 0 }));
   fire("pointerdown", event(442, 336, { button: 0 }));
-  assert.deepEqual(selection.getTiles().map(({ col, row }) => [col, row]), [[1, 0]]);
+  assert.deepEqual(selection.getTiles(), []);
   fire("pointerdown", event(410, 320, { button: 2 }));
-  assert.deepEqual(selection.getTiles().map(({ col, row }) => [col, row]), [[1, 0]]);
+  assert.deepEqual(selection.getTiles(), []);
 
   multiSelect = true;
+  fire("pointerdown", event(442, 336, { button: 0 }));
+  assert.equal(selection.size, 1);
   fire("pointerdown", event(442, 336, { button: 2 }));
   assert.equal(selection.size, 0);
 });
@@ -115,7 +117,7 @@ test("multi-select clicks add tiles while Shift has no effect", () => {
   multiSelect = false;
   fire("pointerdown", event(474, 352, { button: 0, shiftKey: true, pointerId: 11 }));
   assert.deepEqual(selection.getTiles().map(({ col, row }) => [col, row]), [
-    [2, 0],
+    [0, 0], [1, 0],
   ]);
 });
 

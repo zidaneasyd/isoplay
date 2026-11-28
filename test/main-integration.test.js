@@ -54,7 +54,7 @@ test("application startup wires resize, grid input, and render loop", async () =
   }
   const axesToggle = makeToggle(true);
   const gridToggle = makeToggle(true);
-  const multiSelectToggle = makeToggle(false);
+  const multiSelectToggle = makeToggle(true);
   const sandboxModeToggle = makeToggle(false);
   globalThis.document = {
     hidden: false,
@@ -66,7 +66,7 @@ test("application startup wires resize, grid input, and render loop", async () =
         "grid-size-value": output,
         "show-axes": axesToggle,
         "show-grid": gridToggle,
-        "multi-select": multiSelectToggle,
+        "tile-selection": multiSelectToggle,
         "sandbox-mode": sandboxModeToggle,
         "hover-coordinates": hoverOutput,
         "active-coordinates": activeOutput,
@@ -94,7 +94,7 @@ test("application startup wires resize, grid input, and render loop", async () =
     assert.equal(output.value, "9 \u00d7 9");
     assert.equal(axesToggle.checked, true);
     assert.equal(gridToggle.checked, true);
-    assert.equal(canvas.style.cursor, "");
+    assert.equal(canvas.style.cursor, "crosshair");
     assert.ok(listeners.has("resize"));
     assert.ok(listeners.has("orientationchange"));
     assert.ok(listeners.has("focus"));
@@ -115,7 +115,7 @@ test("application startup wires resize, grid input, and render loop", async () =
     assert.equal(calls.fillStyles.at(-1), "rgba(189, 121, 82, 0.5)");
 
     const fillsBeforeSelection = calls.fillStyles.length;
-    fireCanvas("pointerdown", { clientX: 400, clientY: 300, button: 0, pointerId: 6 });
+    fireCanvas("pointerdown", { clientX: 400, clientY: 300, button: 0, pointerId: 6, preventDefault() {} });
     fireCanvas("pointerup", { clientX: 400, clientY: 300 });
     frames.shift()(1012);
     const selectionFrameFills = calls.fillStyles.slice(fillsBeforeSelection);
@@ -136,7 +136,6 @@ test("application startup wires resize, grid input, and render loop", async () =
     frames.shift()(1024);
     assert.equal(calls.strokes - strokesBeforePlain, 1, "only the active selection outline remains on a plain plane");
 
-    multiSelectToggle.checked = true;
     multiSelectToggle.dispatch("change");
     assert.equal(canvas.style.cursor, "crosshair");
     fireCanvas("pointerdown", { clientX: 432, clientY: 316, button: 0, pointerId: 1, preventDefault() {} });
@@ -166,16 +165,15 @@ test("application startup wires resize, grid input, and render loop", async () =
     fireCanvas("pointerdown", { clientX: 432, clientY: 316, button: 0, pointerId: 3 });
     fireCanvas("pointerup", { clientX: 432, clientY: 316 });
     frames.shift()(1038);
-    assert.equal(activeOutput.textContent, "1 tile aktif (1, 0)");
+    assert.equal(activeOutput.textContent, "0 tile aktif", "turning off tile selection blocks pointer selection");
 
     fireCanvas("pointerdown", { clientX: 400, clientY: 300, button: 2, pointerId: 5, preventDefault() {} });
     fireCanvas("pointerup", { clientX: 400, clientY: 300 });
-    assert.equal(activeOutput.textContent, "1 tile aktif (1, 0)", "right click preserves a single selection outside multi-select mode");
+    assert.equal(activeOutput.textContent, "0 tile aktif", "right click is ignored while tile selection is disabled");
 
     fireCanvas("pointerleave");
-    frames.shift()(1040);
     assert.equal(hoverOutput.textContent, "—");
-    assert.equal(activeOutput.textContent, "1 tile aktif (1, 0)");
+    assert.equal(activeOutput.textContent, "0 tile aktif");
 
     slider.value = "11";
     for (const listener of sliderListeners.get("input")) listener();
@@ -187,9 +185,9 @@ test("application startup wires resize, grid input, and render loop", async () =
 
     const fillsBeforeResizeFrame = calls.fills;
     frames.shift()(1056);
-    assert.deepEqual(calls.clears[10], [0, 0, 1024, 768]);
-    assert.equal(calls.fills - fillsBeforeResizeFrame, 2,
-      "board and selected overlay each fill once while axes are hidden");
+    assert.deepEqual(calls.clears.at(-1), [0, 0, 1024, 768]);
+    assert.equal(calls.fills - fillsBeforeResizeFrame, 1,
+      "the board is filled once while tile selection is disabled");
     assert.equal(frames.length, 0, "Dev mode returns to idle after each change-driven render");
 
     sandboxModeToggle.checked = true;

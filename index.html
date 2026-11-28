@@ -3,41 +3,78 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-  <title>Canvas</title>
+  <title>Isometric Canvas</title>
   <link rel="stylesheet" href="./src/css/style.css">
 </head>
 <body>
   <canvas id="canvas" aria-label="Area kanvas"></canvas>
-  <section class="inspector" aria-label="Pengaturan bidang">
-    <div class="inspector-heading">
-      <h1>Ukuran bidang</h1>
-      <output id="grid-size-value" for="grid-size">9 × 9</output>
+
+  <main class="inspector panel" id="left-panel" aria-label="Pengaturan bidang">
+    <button type="button" class="parent-toggle" id="world-toggle" aria-expanded="true" aria-controls="world-inspectors">
+      <span>WORLD</span><span class="chevron" aria-hidden="true">▾</span>
+    </button>
+
+    <div class="inspector-group" id="world-inspectors">
+      <div class="inspector-row">
+        <span class="label-title" id="label-size">Ukuran bidang</span>
+        <div class="stepper" id="size-stepper" role="group" aria-labelledby="label-size" tabindex="0"
+          title="Klik atau scroll untuk mengubah ukuran (ganjil 9–99, langkah 2)">
+          <button type="button" class="step-btn" id="size-dec" aria-label="Kurangi ukuran bidang">−</button>
+          <span class="size" id="size-label">9*</span>
+          <button type="button" class="step-btn" id="size-inc" aria-label="Tambah ukuran bidang">+</button>
+        </div>
+      </div>
+      <input id="grid-size" type="range" min="9" max="99" step="2" value="9" aria-label="Ukuran bidang" class="visually-hidden">
+      <output id="grid-size-value" for="grid-size" class="visually-hidden">9 × 9</output>
+
+      <div class="inspector-row">
+        <label class="row-label" for="show-axes">Sumbu</label>
+        <label class="switch" aria-label="Sumbu"><input id="show-axes" type="checkbox" checked><span class="slider-switch"></span></label>
+      </div>
+      <div class="inspector-row">
+        <label class="row-label" for="show-grid">Grid</label>
+        <label class="switch" aria-label="Grid"><input id="show-grid" type="checkbox" checked><span class="slider-switch"></span></label>
+      </div>
+      <div class="inspector-row">
+        <label class="row-label" for="tile-selection">Tile selection</label>
+        <label class="switch" aria-label="Tile selection"><input id="tile-selection" type="checkbox" checked><span class="slider-switch"></span></label>
+      </div>
+      <div class="inspector-row">
+        <label class="row-label" for="sandbox-mode">Loop</label>
+        <label class="switch" aria-label="Loop"><input id="sandbox-mode" type="checkbox"><span class="slider-switch"></span></label>
+      </div>
     </div>
-    <input id="grid-size" type="range" min="9" max="99" step="1" value="9" aria-label="Ukuran bidang">
-    <div class="inspector-range" aria-hidden="true"><span>9 × 9</span><span>99 × 99</span></div>
-    <div class="inspector-toggles">
-      <label><input id="show-axes" type="checkbox" checked> <span>Sumbu</span></label>
-      <label><input id="show-grid" type="checkbox" checked> <span>Grid</span></label>
+  </main>
+
+  <button type="button" class="panel-drawer-btn" id="panel-toggle" aria-expanded="true" aria-controls="left-panel"
+    aria-label="Sembunyikan panel pengaturan" title="Sembunyikan panel pengaturan">
+    <span class="drawer-chevron" aria-hidden="true">‹</span>
+  </button>
+
+  <button id="reset-camera" class="camera-float-btn" type="button" aria-label="Reset kamera" title="Reset kamera">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M13.5 5.5A6 6 0 1 0 14 8"/><polyline points="13.5 2.5 13.5 5.5 10.5 5.5"/>
+    </svg>
+  </button>
+
+  <aside class="hover-card telemetry-panel" aria-label="Informasi koordinat dan performa tile">
+    <h2 class="section-title">Koordinat tile</h2>
+    <div class="metric-group">
+      <div class="coordinate-row"><span>Hover</span><output id="hover-coordinates" aria-live="polite">—</output></div>
+      <div class="coordinate-row"><span>Tile aktif</span><output id="active-coordinates" aria-live="polite">0 tile aktif</output></div>
     </div>
-    <div class="inspector-toggles">
-      <label><input id="multi-select" type="checkbox"> <span>Seleksi multi</span></label>
+    <h2 class="section-title stats-heading">Performa</h2>
+    <div class="metric-group">
+      <div class="coordinate-row"><span>Tile digambar</span><output id="rendered-tiles">—</output></div>
+      <div class="coordinate-row"><span>Tile terlihat</span><output id="visible-tiles">—</output></div>
+      <div class="coordinate-row"><span>Garis grid</span><output id="rendered-grid-lines">—</output></div>
+      <div class="coordinate-row"><span>FPS</span><output id="render-fps">—</output></div>
+      <div class="coordinate-row"><span>Waktu render</span><output id="render-time">—</output></div>
     </div>
-    <div class="inspector-toggles">
-      <label><input id="sandbox-mode" type="checkbox"> <span>Sandbox (loop kontinu)</span></label>
-    </div>
-    <p class="inspector-help">Scroll: zoom · Klik tengah + geser: pan</p>
-  </section>
-  <section class="hover-card" aria-label="Koordinat tile dan statistik render">
-    <h2>Koordinat tile</h2>
-    <div class="coordinate-row"><span>Hover</span><output id="hover-coordinates" aria-live="polite">—</output></div>
-    <div class="coordinate-row"><span>Tile aktif</span><output id="active-coordinates" aria-live="polite">0 tile aktif</output></div>
-    <h2 class="stats-heading">Performa</h2>
-    <div class="coordinate-row"><span>Tile digambar</span><output id="rendered-tiles">—</output></div>
-    <div class="coordinate-row"><span>Tile terlihat</span><output id="visible-tiles">—</output></div>
-    <div class="coordinate-row"><span>Garis grid</span><output id="rendered-grid-lines">—</output></div>
-    <div class="coordinate-row"><span>FPS</span><output id="render-fps">—</output></div>
-    <div class="coordinate-row"><span>Waktu render</span><output id="render-time">—</output></div>
-  </section>
+  </aside>
+
+  <footer class="help-footer">Scroll: zoom · Klik tengah + geser: pan</footer>
+
   <script type="module" src="./src/js/main.js?v=render-2"></script>
 </body>
 </html>
