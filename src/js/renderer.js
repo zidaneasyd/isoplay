@@ -19,6 +19,109 @@ export function drawTile(context, centerX, centerY, color, strokeColor = null, s
   }
 }
 
+export function createBoardGeometry(gridSize, PathClass = globalThis.Path2D) {
+  if (typeof PathClass !== "function") {
+    throw new Error("Path2D is required to create cached board geometry");
+  }
+  const half = gridSize / 2;
+  const board = new PathClass();
+  const lines = new PathClass();
+  const corners = [[-half, -half], [half, -half], [half, half], [-half, half]]
+    .map(([col, row]) => gridToScreen(col, row));
+
+  board.moveTo(corners[0].x, corners[0].y);
+  for (const corner of corners.slice(1)) board.lineTo(corner.x, corner.y);
+  board.closePath();
+
+  for (let step = 0; step <= gridSize; step += 1) {
+    const offset = step - half;
+    const colStart = gridToScreen(offset, -half);
+    const colEnd = gridToScreen(offset, half);
+    const rowStart = gridToScreen(-half, offset);
+    const rowEnd = gridToScreen(half, offset);
+    lines.moveTo(colStart.x, colStart.y);
+    lines.lineTo(colEnd.x, colEnd.y);
+    lines.moveTo(rowStart.x, rowStart.y);
+    lines.lineTo(rowEnd.x, rowEnd.y);
+  }
+
+  return { gridSize, board, lines, lineCount: 2 * (gridSize + 1) };
+}
+
+export function drawBoard(context, width, height, geometry, {
+  fillColor = "#383838",
+  strokeColor = null,
+  strokeWidth = 1,
+} = {}) {
+  context.save();
+  context.translate(width / 2, height / 2);
+  context.fillStyle = fillColor;
+  context.fill(geometry.board);
+  if (strokeColor) {
+    context.strokeStyle = strokeColor;
+    context.lineWidth = strokeWidth;
+    context.stroke(geometry.lines);
+  }
+  context.restore();
+}
+
+export function drawTileBatch(context, width, height, tiles, {
+  bounds = null,
+  fillColor,
+  strokeColor = null,
+  strokeWidth = 1,
+} = {}) {
+  const originX = width / 2;
+  const originY = height / 2;
+  let count = 0;
+  const edges = new Map();
+
+  function addEdge(from, to) {
+    const fromKey = `${from.x},${from.y}`;
+    const toKey = `${to.x},${to.y}`;
+    const key = fromKey < toKey ? `${fromKey}|${toKey}` : `${toKey}|${fromKey}`;
+    if (!edges.has(key)) edges.set(key, [from, to]);
+  }
+
+  context.beginPath();
+  for (const tile of tiles) {
+    if (!isTileInBounds(tile, bounds)) continue;
+    const position = gridToScreen(tile.col, tile.row);
+    const centerX = originX + position.x;
+    const centerY = originY + position.y - (tile.height ?? 0) * elevationStep;
+    const corners = [
+      { x: centerX, y: centerY - tileH / 2 },
+      { x: centerX + tileW / 2, y: centerY },
+      { x: centerX, y: centerY + tileH / 2 },
+      { x: centerX - tileW / 2, y: centerY },
+    ];
+    context.moveTo(corners[0].x, corners[0].y);
+    for (let index = 1; index < corners.length; index += 1) {
+      context.lineTo(corners[index].x, corners[index].y);
+    }
+    context.closePath();
+    for (let index = 0; index < corners.length; index += 1) {
+      addEdge(corners[index], corners[(index + 1) % corners.length]);
+    }
+    count += 1;
+  }
+  if (count === 0) return 0;
+
+  context.fillStyle = fillColor;
+  context.fill();
+  if (strokeColor) {
+    context.beginPath();
+    for (const [from, to] of edges.values()) {
+      context.moveTo(from.x, from.y);
+      context.lineTo(to.x, to.y);
+    }
+    context.strokeStyle = strokeColor;
+    context.lineWidth = strokeWidth;
+    context.stroke();
+  }
+  return count;
+}
+
 export function getVisibleTileBounds(camera, width, height) {
   const corners = [
     { x: 0, y: 0 },
@@ -114,7 +217,7 @@ export function drawTiles(context, width, height, tiles, {
       drawTile(
         context,
         originX + position.x,
-        originY + position.y - tile.height * elevationStep,
+        originY + position.y - (tile.height ?? 0) * elevationStep,
         color,
         strokeColor,
         strokeWidth
@@ -129,7 +232,7 @@ export function drawTiles(context, width, height, tiles, {
       context.beginPath();
     }
     const centerX = originX + position.x;
-    const centerY = originY + position.y - tile.height * elevationStep;
+    const centerY = originY + position.y - (tile.height ?? 0) * elevationStep;
     context.moveTo(centerX, centerY - tileH / 2);
     context.lineTo(centerX + tileW / 2, centerY);
     context.lineTo(centerX, centerY + tileH / 2);
@@ -148,7 +251,7 @@ export function drawGrid(
   height,
   gridWidth,
   gridHeight = gridWidth,
-  { showAxes = true, showGrid = true, strokeScale = 1, bounds = null } = {}
+  { showAxes = true, showGrid = true, strokeScale = 1, bounds = null, onGridLines = null } = {}
 ) {
   // Cell coordinates are centered on the world origin; odd dimensions put (0, 0) on a cell.
   const colCenter = (gridWidth - 1) / 2;
@@ -201,6 +304,9 @@ export function drawGrid(
       context.lineWidth = strokeScale;
       context.stroke();
     }
+    onGridLines?.(edges.size);
+  } else {
+    onGridLines?.(0);
   }
 
   if (!showAxes) return renderedGridCells;

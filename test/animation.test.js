@@ -67,3 +67,28 @@ test("continuous mode preserves long frame gaps for future scene updates", () =>
     assert.equal(queued.length, 0);
   });
 });
+
+test("scheduler accepts injected frame functions and cancels a pending frame", () => {
+  const queue = new Map();
+  const cancelled = [];
+  let nextId = 1;
+  const scheduler = createRenderScheduler(() => {}, {
+    requestFrame(callback) {
+      const id = nextId++;
+      queue.set(id, callback);
+      return id;
+    },
+    cancelFrame(id) {
+      cancelled.push(id);
+      queue.delete(id);
+    },
+  });
+
+  assert.equal(scheduler.isPending(), false);
+  scheduler.invalidate();
+  assert.equal(scheduler.isPending(), true);
+  scheduler.cancel();
+  assert.deepEqual(cancelled, [1]);
+  assert.equal(queue.size, 0);
+  assert.equal(scheduler.isPending(), false);
+});

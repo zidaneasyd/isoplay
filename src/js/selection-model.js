@@ -33,6 +33,9 @@ export function createSelectionModel() {
     getTiles() {
       return [...tiles.values()];
     },
+    values() {
+      return tiles.values();
+    },
     get size() {
       return tiles.size;
     },

@@ -27,6 +27,14 @@ function tilesOnLine(start, end) {
   return tiles;
 }
 
+function sameTile(a, b) {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  return a.col === b.col && a.row === b.row
+    && (a.height ?? 0) === (b.height ?? 0)
+    && (a.color ?? null) === (b.color ?? null);
+}
+
 export function getTileAtPoint(point, width, height, gridSize) {
   if (!point) return null;
 
@@ -61,7 +69,10 @@ export function attachTileInteraction(canvas, {
   }
 
   function updateHover() {
-    hoveredTile = tileAtPointer();
+    const nextTile = tileAtPointer();
+    const unchanged = sameTile(hoveredTile, nextTile);
+    hoveredTile = nextTile;
+    if (unchanged) return;
     onHover(hoveredTile);
   }
 

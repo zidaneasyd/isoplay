@@ -1,10 +1,12 @@
 export function createInspector(sizeInput, sizeValue, axesInput, gridInput, multiSelectInput) {
-  let gridSize = Number(sizeInput.value);
+  let gridSize = 9;
   let showAxes = axesInput ? axesInput.checked : true;
   let showGrid = gridInput ? gridInput.checked : true;
 
   function updateGridSize() {
-    gridSize = Number(sizeInput.value);
+    const requestedSize = Number(sizeInput.value);
+    gridSize = Number.isFinite(requestedSize) ? Math.round(Math.min(99, Math.max(9, requestedSize))) : 9;
+    sizeInput.value = String(gridSize);
     sizeValue.value = `${gridSize} × ${gridSize}`;
     sizeValue.textContent = sizeValue.value;
   }

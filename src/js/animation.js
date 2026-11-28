@@ -1,11 +1,20 @@
-﻿export function createRenderScheduler(render) {
+﻿export function createRenderScheduler(render, {
+  requestFrame = (callback) => requestAnimationFrame(callback),
+  cancelFrame = (id) => globalThis.cancelAnimationFrame?.(id),
+} = {}) {
   let frameId = null;
   let continuous = false;
   let previousTime = null;
   let disposed = false;
 
   function schedule() {
-    if (!disposed && frameId === null) frameId = requestAnimationFrame(frame);
+    if (!disposed && frameId === null) frameId = requestFrame(frame);
+  }
+
+  function cancelPendingFrame() {
+    if (frameId === null) return;
+    cancelFrame(frameId);
+    frameId = null;
   }
 
   function frame(time) {
@@ -24,11 +33,12 @@
       if (continuous) schedule();
     },
     isContinuous: () => continuous,
+    isPending: () => frameId !== null,
+    cancel: cancelPendingFrame,
     dispose() {
       disposed = true;
       continuous = false;
-      if (frameId !== null) globalThis.cancelAnimationFrame?.(frameId);
-      frameId = null;
+      cancelPendingFrame();
     },
   };
 }

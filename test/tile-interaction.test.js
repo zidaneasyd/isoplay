@@ -157,6 +157,25 @@ test("refreshHover recalculates the remembered pointer after the canvas resizes"
   assert.deepEqual(interaction.getHoveredTile(), { col: -1, row: 1, height: 0 });
 });
 
+test("hover changes notify once per tile rather than once per pointer event", () => {
+  const canvas = makeCanvas();
+  const hovers = [];
+  const interaction = attachTileInteraction(canvas, {
+    getCanvasSize: () => ({ width: 800, height: 600 }),
+    getGridSize: () => 9,
+    selection: createSelectionModel(),
+    onHover: (tile) => hovers.push(tile),
+  });
+
+  canvas.listeners.get("pointermove")(event(410, 320));
+  canvas.listeners.get("pointermove")(event(411, 321));
+  interaction.refreshHover();
+  assert.equal(hovers.length, 1);
+  canvas.listeners.get("pointermove")(event(442, 336));
+  assert.equal(hovers.length, 2);
+  assert.deepEqual(hovers.at(-1), { col: 1, row: 0, height: 0 });
+});
+
 test("tile picking follows camera pan and zoom transforms", () => {
   const canvas = makeCanvas();
   const camera = createCamera();

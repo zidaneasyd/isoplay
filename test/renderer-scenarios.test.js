@@ -119,6 +119,22 @@ test("drawGrid hides axis guides and tile grid independently", () => {
   assert.equal(plain.calls.fills, 0);
 });
 
+test("drawGrid reports the number of unique visible edge segments", () => {
+  let lineCount = null;
+  drawGrid(createContext().context, 800, 600, 3, 3, {
+    showAxes: false,
+    onGridLines(count) { lineCount = count; },
+  });
+  assert.equal(lineCount, 24);
+
+  drawGrid(createContext().context, 800, 600, 3, 3, {
+    showAxes: false,
+    showGrid: false,
+    onGridLines(count) { lineCount = count; },
+  });
+  assert.equal(lineCount, 0);
+});
+
 test("drawGrid scales stroke width inversely to camera zoom", () => {
   const widths = [];
   const context = {

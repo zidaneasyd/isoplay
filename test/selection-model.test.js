@@ -30,3 +30,10 @@ test("selection trims tiles outside a resized grid and reports whether it change
   assert.deepEqual(selection.getTiles(), [tile(2, -2)]);
   assert.equal(selection.retainWithinGrid(5), false);
 });
+
+test("selection values iterates selected tiles without building an array", () => {
+  const selection = createSelectionModel();
+  selection.add(tile(0, 0));
+  selection.add(tile(1, 0));
+  assert.deepEqual([...selection.values()].map(({ col, row }) => [col, row]), [[0, 0], [1, 0]]);
+});

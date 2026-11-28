@@ -1,10 +1,20 @@
 import { createCanvas } from "./canvas.js";
 import { attachCameraControls, createCamera } from "./camera.js?v=camera-1";
-import { createRenderScheduler } from "./animation.js";
+import { createRenderScheduler } from "./animation.js?v=render-2";
 import { preventBrowserZoom } from "./browser-controls.js";
-import { drawGrid, drawTile, drawTiles, getVisibleTileBounds, isTileInBounds } from "./renderer.js";
+import {
+  createBoardGeometry,
+  drawBoard,
+  drawGrid,
+  drawTile,
+  drawTileBatch,
+  drawTiles,
+  getVisibleTileBounds,
+  isTileInBounds,
+} from "./renderer.js?v=render-2";
 import { gridToScreen, tileH } from "./isometric.js";
 import { createInspector } from "./inspector.js?v=camera-1";
+import { createRenderStats } from "./render-stats.js?v=stats-1";
 import { createGridTiles } from "./grid-model.js";
 import { createSelectionModel } from "./selection-model.js";
 import { attachTileInteraction } from "./tile-interaction.js?v=camera-1";
@@ -25,12 +35,12 @@ const panel = createTileInfoPanel(
   document.getElementById("hover-coordinates"),
   document.getElementById("active-coordinates")
 );
-const renderStats = {
+const renderStats = createRenderStats({
   tiles: document.getElementById("rendered-tiles"),
-  gridCells: document.getElementById("rendered-grid-cells"),
+  gridLines: document.getElementById("rendered-grid-lines"),
   fps: document.getElementById("render-fps"),
   time: document.getElementById("render-time"),
-};
+});
 const camera = createCamera();
 const sandbox = createSandbox();
 let requestRender = () => {};
@@ -74,9 +84,7 @@ attachCameraControls(canvas, {
 
 let cachedGridSize = null;
 let gridTiles = [];
-let fpsElapsed = 0;
-let fpsFrames = 0;
-let measuredFps = null;
+let boardGeometry = null;
 function renderFrame(dt) {
   if (sandbox.isActive()) sandbox.update(dt);
   const renderStartedAt = performance.now();
@@ -88,30 +96,66 @@ function renderFrame(dt) {
   if (gridSize !== cachedGridSize) {
     cachedGridSize = gridSize;
     gridTiles = createGridTiles(gridSize);
+    boardGeometry = typeof globalThis.Path2D === "function" ? createBoardGeometry(gridSize) : null;
   }
   if (selection.retainWithinGrid(gridSize)) panel.showActive(selection.getTiles());
 
   context.clearRect(0, 0, width, height);
   context.save();
   camera.applyToContext(context, width, height);
-  let renderedTiles = drawTiles(context, width, height, gridTiles, {
-    alreadySorted: true,
-    bounds: visibleBounds,
-  });
-  const renderedGridCells = drawGrid(context, width, height, gridSize, gridSize, {
-    showAxes: inspector.getShowAxes(),
-    showGrid,
-    strokeScale,
-    bounds: visibleBounds,
-  });
+  let renderedTiles;
+  let renderedGridLines = 0;
+  const flatBoardColor = gridTiles.length > 0 ? (gridTiles[0].color ?? "#383838") : null;
+  const canDrawBoard = boardGeometry !== null && flatBoardColor !== null
+    && gridTiles.every((tile) => (tile.color ?? "#383838") === flatBoardColor && (tile.height ?? 0) === 0);
+  if (canDrawBoard) {
+    drawBoard(context, width, height, boardGeometry, {
+      fillColor: flatBoardColor,
+      strokeColor: showGrid ? "#484848" : null,
+      strokeWidth: strokeScale,
+    });
+    renderedTiles = gridTiles.length;
+    renderedGridLines = showGrid ? boardGeometry.lineCount : 0;
+    drawGrid(context, width, height, gridSize, gridSize, {
+      showAxes: inspector.getShowAxes(),
+      showGrid: false,
+      strokeScale,
+    });
+  } else {
+    renderedTiles = drawTiles(context, width, height, gridTiles, {
+      alreadySorted: true,
+      bounds: visibleBounds,
+    });
+    drawGrid(context, width, height, gridSize, gridSize, {
+      showAxes: inspector.getShowAxes(),
+      showGrid,
+      strokeScale,
+      bounds: visibleBounds,
+      onGridLines(count) { renderedGridLines = count; },
+    });
+  }
 
   const hoveredTile = interaction.getHoveredTile();
-  if (hoveredTile) {
+  let selectedHeight;
+  let hasSelectedTiles = false;
+  let canBatchSelection = true;
+  let hoveredTileIsSelected = false;
+  for (const tile of selection.values()) {
+    const height = tile.height ?? 0;
+    if (!hasSelectedTiles) {
+      selectedHeight = height;
+      hasSelectedTiles = true;
+    } else if (selectedHeight !== height) canBatchSelection = false;
+    if (hoveredTile && tile.col === hoveredTile.col && tile.row === hoveredTile.row
+      && height === (hoveredTile.height ?? 0)) hoveredTileIsSelected = true;
+  }
+
+  if (hoveredTile && !hoveredTileIsSelected) {
     const position = gridToScreen(hoveredTile.col, hoveredTile.row);
     drawTile(
       context,
       width / 2 + position.x,
-      height / 2 + position.y - hoveredTile.height * tileH / 2,
+      height / 2 + position.y - (hoveredTile.height ?? 0) * tileH / 2,
       "rgba(189, 121, 82, 0.5)",
       "rgba(255, 184, 138, 0.5)",
       2 * strokeScale
@@ -119,35 +163,35 @@ function renderFrame(dt) {
     renderedTiles += 1;
   }
 
-  for (const tile of selection.getTiles()) {
-    if (!isTileInBounds(tile, visibleBounds)) continue;
-    const position = gridToScreen(tile.col, tile.row);
-    drawTile(
-      context,
-      width / 2 + position.x,
-      height / 2 + position.y - tile.height * tileH / 2,
-      "rgba(153, 132, 194, 0.5)",
-      "rgba(211, 198, 255, 0.5)",
-      2 * strokeScale
-    );
-    renderedTiles += 1;
+  if (canBatchSelection) {
+    renderedTiles += drawTileBatch(context, width, height, selection.values(), {
+      bounds: visibleBounds,
+      fillColor: "rgba(153, 132, 194, 0.5)",
+      strokeColor: "rgba(211, 198, 255, 0.5)",
+      strokeWidth: 2 * strokeScale,
+    });
+  } else {
+    for (const tile of selection.values()) {
+      if (!isTileInBounds(tile, visibleBounds)) continue;
+      const position = gridToScreen(tile.col, tile.row);
+      drawTile(
+        context,
+        width / 2 + position.x,
+        height / 2 + position.y - (tile.height ?? 0) * tileH / 2,
+        "rgba(153, 132, 194, 0.5)",
+        "rgba(211, 198, 255, 0.5)",
+        2 * strokeScale
+      );
+      renderedTiles += 1;
+    }
   }
   context.restore();
 
-  const renderDuration = performance.now() - renderStartedAt;
-  if (dt > 0) {
-    fpsElapsed += dt;
-    fpsFrames += 1;
-    if (fpsElapsed >= 0.5) {
-      measuredFps = Math.round(fpsFrames / fpsElapsed);
-      fpsElapsed = 0;
-      fpsFrames = 0;
-    }
-  }
-  if (renderStats.tiles) renderStats.tiles.textContent = String(renderedTiles);
-  if (renderStats.gridCells) renderStats.gridCells.textContent = String(renderedGridCells);
-  if (renderStats.fps) renderStats.fps.textContent = measuredFps === null ? "—" : String(measuredFps);
-  if (renderStats.time) renderStats.time.textContent = `${renderDuration.toFixed(2)} ms`;
+  renderStats.record({
+    tiles: renderedTiles,
+    gridLines: renderedGridLines,
+    renderMs: performance.now() - renderStartedAt,
+  });
 }
 
 const scheduler = createRenderScheduler(renderFrame);
