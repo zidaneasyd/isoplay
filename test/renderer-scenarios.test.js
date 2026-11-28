@@ -73,6 +73,23 @@ test("drawTiles paints solid diamonds from back to front by diagonal then height
   assert.deepEqual(fills[1].center, [200, 134]);
 });
 
+test("drawTiles can use pre-sorted tiles and falls back to the default color", () => {
+  const fills = [];
+  const context = {
+    beginPath() {}, moveTo() {}, lineTo() {}, closePath() {},
+    fill() { fills.push(context.fillStyle); },
+  };
+  const tiles = [
+    { col: 1, row: 0, height: 0, color: "already first" },
+    { col: 0, row: 0, height: 0 },
+  ];
+
+  drawTiles(context, 400, 300, tiles, { alreadySorted: true });
+
+  assert.deepEqual(fills, ["already first", "#383838"]);
+  assert.deepEqual(tiles.map(({ col, row }) => [col, row]), [[1, 0], [0, 0]]);
+});
+
 test("drawGrid hides axis guides and tile grid independently", () => {
   const gridOnly = createContext();
   drawGrid(gridOnly.context, 800, 600, 3, 3, { showAxes: false, showGrid: true });
@@ -88,4 +105,18 @@ test("drawGrid hides axis guides and tile grid independently", () => {
   drawGrid(plain.context, 800, 600, 3, 3, { showAxes: false, showGrid: false });
   assert.equal(plain.calls.strokes, 0);
   assert.equal(plain.calls.fills, 0);
+});
+
+test("drawGrid scales stroke width inversely to camera zoom", () => {
+  const widths = [];
+  const context = {
+    beginPath() {}, moveTo() {}, lineTo() {}, closePath() {}, arc() {},
+    fill() {},
+    stroke() { widths.push(context.lineWidth); },
+  };
+
+  drawGrid(context, 800, 600, 3, 3, { strokeScale: 0.5 });
+
+  assert.equal(widths.length, 3 * 3 + 4);
+  assert.ok(widths.every((width) => width === 0.5));
 });

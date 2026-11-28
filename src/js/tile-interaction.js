@@ -43,6 +43,8 @@ export function getTileAtPoint(point, width, height, gridSize) {
 export function attachTileInteraction(canvas, {
   getCanvasSize,
   getGridSize,
+  camera = { screenToWorld: (point) => point },
+  getMultiSelect = () => false,
   selection,
   onHover = () => {},
   onSelectionChange = () => {},
@@ -53,8 +55,9 @@ export function attachTileInteraction(canvas, {
   let lastDragTile = null;
 
   function tileAtPointer() {
+    if (!pointer) return null;
     const { width, height } = getCanvasSize();
-    return getTileAtPoint(pointer, width, height, getGridSize());
+    return getTileAtPoint(camera.screenToWorld(pointer, width, height), width, height, getGridSize());
   }
 
   function updateHover() {
@@ -93,7 +96,12 @@ export function attachTileInteraction(canvas, {
     pointermove(event) {
       pointer = canvasPoint(event);
       updateHover();
-      if (dragMode && (event.buttons & (dragMode === "add" ? 1 : 2))) updateDragSelection(dragMode);
+      if (dragMode === "add" && !getMultiSelect()) {
+        dragMode = null;
+        lastDragTile = null;
+      }
+      if (dragMode === "add" && (event.buttons & 1)) updateDragSelection("add");
+      if (dragMode === "remove" && (event.buttons & 2)) updateDragSelection("remove");
     },
     pointerleave() {
       if (!dragMode) {
@@ -105,15 +113,15 @@ export function attachTileInteraction(canvas, {
       pointer = canvasPoint(event);
       updateHover();
 
-      if (event.button === 0 && !event.shiftKey) {
+      if (event.button === 2 && !getMultiSelect()) return;
+
+      if (event.button === 0 && !getMultiSelect()) {
         selection.selectOnly(tileAtPointer());
         onSelectionChange(selection.getTiles());
         return;
       }
 
-      const mode = event.button === 0 && event.shiftKey
-        ? "add"
-        : event.button === 2 ? "remove" : null;
+      const mode = event.button === 0 ? "add" : event.button === 2 ? "remove" : null;
       if (!mode) return;
 
       event.preventDefault();

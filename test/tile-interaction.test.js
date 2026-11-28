@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { createCamera } from "../src/js/camera.js";
 import { attachTileInteraction, getTileAtPoint } from "../src/js/tile-interaction.js";
 import { createSelectionModel } from "../src/js/selection-model.js";
 
@@ -27,7 +28,7 @@ test("tile picking handles center, offset canvas, edges, and points outside the 
   assert.equal(getTileAtPoint(null, 800, 600, 9), null);
 });
 
-test("pointer interactions add by shift drag, erase by right drag, and preserve hover", () => {
+test("multi-select mode adds by left drag, erases by right drag, and preserves hover", () => {
   const canvas = makeCanvas();
   const selection = createSelectionModel();
   const hovers = [];
@@ -35,6 +36,7 @@ test("pointer interactions add by shift drag, erase by right drag, and preserve 
   const interaction = attachTileInteraction(canvas, {
     getCanvasSize: () => ({ width: 800, height: 600 }),
     getGridSize: () => 9,
+    getMultiSelect: () => true,
     selection,
     onHover: (tile) => hovers.push(tile),
     onSelectionChange: (tiles) => selectionCounts.push(tiles.length),
@@ -44,7 +46,7 @@ test("pointer interactions add by shift drag, erase by right drag, and preserve 
   fire("pointermove", event(410, 320));
   assert.deepEqual(interaction.getHoveredTile(), { col: 0, row: 0, height: 0 });
 
-  const start = event(410, 320, { button: 0, shiftKey: true, pointerId: 1 });
+  const start = event(410, 320, { button: 0, pointerId: 1 });
   fire("pointerdown", start);
   assert.equal(start.defaultPrevented, true);
   fire("pointermove", event(506, 368, { buttons: 1 }));
@@ -69,12 +71,14 @@ test("pointer interactions add by shift drag, erase by right drag, and preserve 
   assert.equal(canvas.listeners.size, 0);
 });
 
-test("ordinary click replaces selection and right click removes a single tile", () => {
+test("right click only removes selection while multi-select mode is active", () => {
   const canvas = makeCanvas();
   const selection = createSelectionModel();
+  let multiSelect = false;
   attachTileInteraction(canvas, {
     getCanvasSize: () => ({ width: 800, height: 600 }),
     getGridSize: () => 9,
+    getMultiSelect: () => multiSelect,
     selection,
   });
   const fire = (name, input) => canvas.listeners.get(name)(input);
@@ -82,6 +86,93 @@ test("ordinary click replaces selection and right click removes a single tile", 
   fire("pointerdown", event(410, 320, { button: 0 }));
   fire("pointerdown", event(442, 336, { button: 0 }));
   assert.deepEqual(selection.getTiles().map(({ col, row }) => [col, row]), [[1, 0]]);
+  fire("pointerdown", event(410, 320, { button: 2 }));
+  assert.deepEqual(selection.getTiles().map(({ col, row }) => [col, row]), [[1, 0]]);
+
+  multiSelect = true;
   fire("pointerdown", event(442, 336, { button: 2 }));
   assert.equal(selection.size, 0);
+});
+
+test("multi-select clicks add tiles while Shift has no effect", () => {
+  const canvas = makeCanvas();
+  const selection = createSelectionModel();
+  let multiSelect = true;
+  attachTileInteraction(canvas, {
+    getCanvasSize: () => ({ width: 800, height: 600 }),
+    getGridSize: () => 9,
+    getMultiSelect: () => multiSelect,
+    selection,
+  });
+  const fire = (name, input) => canvas.listeners.get(name)(input);
+
+  fire("pointerdown", event(410, 320, { button: 0, pointerId: 9 }));
+  fire("pointerdown", event(442, 336, { button: 0, pointerId: 10 }));
+  assert.deepEqual(selection.getTiles().map(({ col, row }) => [col, row]), [
+    [0, 0], [1, 0],
+  ]);
+
+  multiSelect = false;
+  fire("pointerdown", event(474, 352, { button: 0, shiftKey: true, pointerId: 11 }));
+  assert.deepEqual(selection.getTiles().map(({ col, row }) => [col, row]), [
+    [2, 0],
+  ]);
+});
+
+test("cancelled drag stops changing the selection on later pointer moves", () => {
+  const canvas = makeCanvas();
+  const selection = createSelectionModel();
+  attachTileInteraction(canvas, {
+    getCanvasSize: () => ({ width: 800, height: 600 }),
+    getGridSize: () => 9,
+    getMultiSelect: () => true,
+    selection,
+  });
+  const fire = (name, input = event(0, 0)) => canvas.listeners.get(name)(input);
+
+  fire("pointerdown", event(410, 320, { button: 0, shiftKey: true, pointerId: 7 }));
+  fire("pointermove", event(442, 336, { buttons: 1 }));
+  assert.deepEqual(selection.getTiles().map(({ col, row }) => [col, row]), [[0, 0], [1, 0]]);
+
+  fire("pointercancel");
+  fire("pointermove", event(474, 352, { buttons: 1 }));
+  assert.deepEqual(selection.getTiles().map(({ col, row }) => [col, row]), [[0, 0], [1, 0]]);
+});
+
+test("refreshHover recalculates the remembered pointer after the canvas resizes", () => {
+  const canvas = makeCanvas();
+  const selection = createSelectionModel();
+  let size = { width: 800, height: 600 };
+  const interaction = attachTileInteraction(canvas, {
+    getCanvasSize: () => size,
+    getGridSize: () => 9,
+    selection,
+  });
+
+  canvas.listeners.get("pointermove")(event(410, 320));
+  assert.deepEqual(interaction.getHoveredTile(), { col: 0, row: 0, height: 0 });
+
+  size = { width: 896, height: 600 };
+  interaction.refreshHover();
+  assert.deepEqual(interaction.getHoveredTile(), { col: -1, row: 1, height: 0 });
+});
+
+test("tile picking follows camera pan and zoom transforms", () => {
+  const canvas = makeCanvas();
+  const camera = createCamera();
+  const selection = createSelectionModel();
+  attachTileInteraction(canvas, {
+    getCanvasSize: () => ({ width: 800, height: 600 }),
+    getGridSize: () => 9,
+    camera,
+    selection,
+  });
+  const fire = (name, input) => canvas.listeners.get(name)(input);
+
+  camera.panBy(20, 10);
+  camera.zoomAt(2, { x: 400, y: 300 }, 800, 600);
+  const tileScreenPoint = camera.worldToScreen({ x: 432, y: 316 }, 800, 600);
+  fire("pointerdown", event(tileScreenPoint.x + 10, tileScreenPoint.y + 20, { button: 0 }));
+
+  assert.deepEqual(selection.getTiles().map(({ col, row }) => [col, row]), [[1, 0]]);
 });

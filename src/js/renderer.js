@@ -45,7 +45,7 @@ export function drawGrid(
   height,
   gridWidth,
   gridHeight = gridWidth,
-  { showAxes = true, showGrid = true } = {}
+  { showAxes = true, showGrid = true, strokeScale = 1 } = {}
 ) {
   // Cell coordinates are centered on the world origin; odd dimensions put (0, 0) on a cell.
   const colCenter = (gridWidth - 1) / 2;
@@ -67,7 +67,7 @@ export function drawGrid(
         context.lineTo(tileX - tileW / 2, tileY);
         context.closePath();
         context.strokeStyle = "#484848";
-        context.lineWidth = 1;
+        context.lineWidth = strokeScale;
         context.stroke();
       }
     }
@@ -84,14 +84,14 @@ export function drawGrid(
   context.moveTo(originX + colAxisStart.x, originY + colAxisStart.y);
   context.lineTo(originX + colAxisEnd.x, originY + colAxisEnd.y);
   context.strokeStyle = "#3b82f6";
-  context.lineWidth = 1;
+  context.lineWidth = strokeScale;
   context.stroke();
 
   context.beginPath();
   context.moveTo(originX + rowAxisStart.x, originY + rowAxisStart.y);
   context.lineTo(originX + rowAxisEnd.x, originY + rowAxisEnd.y);
   context.strokeStyle = "#ef4444";
-  context.lineWidth = 1;
+  context.lineWidth = strokeScale;
   context.stroke();
 
   const yAxisTipX = originX;
@@ -101,7 +101,7 @@ export function drawGrid(
   context.moveTo(originX, originY);
   context.lineTo(yAxisTipX, yAxisTipY);
   context.strokeStyle = "#22c55e";
-  context.lineWidth = 1;
+  context.lineWidth = strokeScale;
   context.stroke();
 
   context.beginPath();
@@ -110,12 +110,12 @@ export function drawGrid(
   context.moveTo(yAxisTipX, yAxisTipY);
   context.lineTo(yAxisTipX + arrowSize / 2, yAxisTipY + arrowSize);
   context.strokeStyle = "#22c55e";
-  context.lineWidth = 1;
+  context.lineWidth = strokeScale;
   context.stroke();
 
   // Mark the world origin where the two grid axes meet.
   context.beginPath();
-  context.arc(originX, originY, 3, 0, Math.PI * 2);
+  context.arc(originX, originY, 3 * strokeScale, 0, Math.PI * 2);
   context.fillStyle = "#f5f5f5";
   context.fill();
 }

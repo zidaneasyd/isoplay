@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createCanvas } from "./src/js/canvas.js";
+import { createCanvas } from "../src/js/canvas.js";
 
 function withWindow(value, callback) {
   const original = globalThis.window;

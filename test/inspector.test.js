@@ -57,3 +57,22 @@ test("inspector exposes axis and grid visibility toggles", () => {
   assert.equal(inspector.getShowAxes(), false);
   assert.equal(inspector.getShowGrid(), false);
 });
+
+test("inspector defaults axes and grid to visible when toggles are omitted", () => {
+  const inspector = createInspector(createInput(9), {});
+
+  assert.equal(inspector.getShowAxes(), true);
+  assert.equal(inspector.getShowGrid(), true);
+  assert.equal(inspector.getMultiSelect(), false);
+});
+
+test("inspector exposes the multi-select toggle state", () => {
+  const multiSelect = createInput("");
+  multiSelect.checked = false;
+  const inspector = createInspector(createInput(9), {}, undefined, undefined, multiSelect);
+
+  assert.equal(inspector.getMultiSelect(), false);
+  multiSelect.checked = true;
+  multiSelect.dispatch("change");
+  assert.equal(inspector.getMultiSelect(), true);
+});

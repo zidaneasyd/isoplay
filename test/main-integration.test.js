@@ -11,6 +11,7 @@ test("application startup wires resize, grid input, and render loop", async () =
   const context = {
     setTransform: (...args) => calls.transforms.push(args),
     clearRect: (...args) => calls.clears.push(args),
+    save() {}, restore() {}, translate() {}, scale() {},
     beginPath() {}, moveTo() {}, lineTo() {}, closePath() {}, arc() {},
     fill() { calls.fills += 1; calls.fillStyles.push(context.fillStyle); },
     stroke() { calls.strokes += 1; calls.strokeStyles.push(context.strokeStyle); },
@@ -19,7 +20,11 @@ test("application startup wires resize, grid input, and render loop", async () =
   const canvas = {
     width: 0,
     height: 0,
-    addEventListener(name, listener) { canvasListeners.set(name, listener); },
+    style: {},
+    addEventListener(name, listener) {
+      if (!canvasListeners.has(name)) canvasListeners.set(name, []);
+      canvasListeners.get(name).push(listener);
+    },
     getBoundingClientRect() { return { left: 0, top: 0 }; },
     getContext(type) { assert.equal(type, "2d"); return context; },
   };
@@ -31,6 +36,9 @@ test("application startup wires resize, grid input, and render loop", async () =
   const output = {};
   const hoverOutput = {};
   const activeOutput = {};
+  const fireCanvas = (name, event = {}) => {
+    for (const listener of canvasListeners.get(name) ?? []) listener(event);
+  };
   function makeToggle(checked) {
     const listeners = new Map();
     return {
@@ -41,6 +49,7 @@ test("application startup wires resize, grid input, and render loop", async () =
   }
   const axesToggle = makeToggle(true);
   const gridToggle = makeToggle(true);
+  const multiSelectToggle = makeToggle(false);
   globalThis.document = {
     getElementById(id) {
       return ({
@@ -49,6 +58,7 @@ test("application startup wires resize, grid input, and render loop", async () =
         "grid-size-value": output,
         "show-axes": axesToggle,
         "show-grid": gridToggle,
+        "multi-select": multiSelectToggle,
         "hover-coordinates": hoverOutput,
         "active-coordinates": activeOutput,
       })[id];
@@ -63,22 +73,24 @@ test("application startup wires resize, grid input, and render loop", async () =
   globalThis.requestAnimationFrame = (callback) => { frames.push(callback); return frames.length; };
 
   try {
-    await import(`./src/js/main.js?test=${Date.now()}`);
+    await import(`../src/js/main.js?test=${Date.now()}`);
 
     assert.deepEqual([canvas.width, canvas.height], [1600, 1200]);
     assert.deepEqual(calls.transforms, [[2, 0, 0, 2, 0, 0]]);
     assert.equal(output.value, "9 \u00d7 9");
     assert.equal(axesToggle.checked, true);
     assert.equal(gridToggle.checked, true);
+    assert.equal(canvas.style.cursor, "");
     assert.ok(listeners.has("resize"));
     assert.ok(listeners.has("wheel"));
+    assert.ok(canvasListeners.has("wheel"), "camera controls attach canvas zoom");
     assert.equal(frames.length, 1);
 
     frames.shift()(1000);
     assert.deepEqual(calls.clears[0], [0, 0, 800, 600]);
     assert.equal(calls.fills, 9 * 9 + 1);
 
-    canvasListeners.get("pointermove")({ clientX: 400, clientY: 300 });
+    fireCanvas("pointermove", { clientX: 400, clientY: 300 });
     frames.shift()(1008);
     assert.equal(hoverOutput.textContent, "(0, 0)");
     assert.equal(calls.fillStyles.at(-1), "rgba(189, 121, 82, 0.5)");
@@ -95,26 +107,43 @@ test("application startup wires resize, grid input, and render loop", async () =
     frames.shift()(1024);
     assert.equal(calls.strokes - strokesBeforePlain, 1, "only the hover outline remains on a plain plane");
 
-    canvasListeners.get("pointerdown")({ clientX: 432, clientY: 316, button: 0, shiftKey: true, pointerId: 1, preventDefault() {} });
-    canvasListeners.get("pointermove")({ clientX: 400, clientY: 300, buttons: 1 });
-    canvasListeners.get("pointerup")({ clientX: 400, clientY: 300 });
+    multiSelectToggle.checked = true;
+    multiSelectToggle.dispatch("change");
+    assert.equal(canvas.style.cursor, "crosshair");
+    fireCanvas("pointerdown", { clientX: 432, clientY: 316, button: 0, pointerId: 1, preventDefault() {} });
+    fireCanvas("pointermove", { clientX: 400, clientY: 300, buttons: 1 });
+    fireCanvas("pointerup", { clientX: 400, clientY: 300 });
     frames.shift()(1032);
     assert.equal(hoverOutput.textContent, "(0, 0)");
     assert.equal(activeOutput.textContent, "2 tile aktif");
     assert.equal(calls.fillStyles.at(-1), "rgba(153, 132, 194, 0.5)");
     assert.equal(calls.strokeStyles.at(-1), "rgba(211, 198, 255, 0.5)");
 
-    canvasListeners.get("pointerdown")({ clientX: 400, clientY: 300, button: 2, shiftKey: false, pointerId: 2, preventDefault() {} });
-    canvasListeners.get("pointermove")({ clientX: 432, clientY: 316, buttons: 2 });
-    canvasListeners.get("pointerup")({ clientX: 432, clientY: 316 });
-    frames.shift()(1036);
-    assert.equal(activeOutput.textContent, "0 tile aktif", "right-drag removes selected tiles");
+    fireCanvas("pointerdown", { clientX: 368, clientY: 284, button: 0, pointerId: 4, preventDefault() {} });
+    fireCanvas("pointerup", { clientX: 368, clientY: 284 });
+    frames.shift()(1034);
+    assert.equal(activeOutput.textContent, "3 tile aktif", "multi-select click adds to the existing selection");
 
-    canvasListeners.get("pointerdown")({ clientX: 432, clientY: 316, button: 0, shiftKey: false, pointerId: 3 });
+    fireCanvas("pointerdown", { clientX: 400, clientY: 300, button: 2, shiftKey: false, pointerId: 2, preventDefault() {} });
+    fireCanvas("pointermove", { clientX: 432, clientY: 316, buttons: 2 });
+    fireCanvas("pointerup", { clientX: 432, clientY: 316 });
+    frames.shift()(1036);
+    assert.equal(activeOutput.textContent, "1 tile aktif (-1, 0)", "right-drag removes only the tiles on its path");
+
+    multiSelectToggle.checked = false;
+    multiSelectToggle.dispatch("change");
+    assert.equal(canvas.style.cursor, "");
+    assert.equal(activeOutput.textContent, "0 tile aktif", "turning off multi-select clears its selection");
+    fireCanvas("pointerdown", { clientX: 432, clientY: 316, button: 0, pointerId: 3 });
+    fireCanvas("pointerup", { clientX: 432, clientY: 316 });
     frames.shift()(1038);
     assert.equal(activeOutput.textContent, "1 tile aktif (1, 0)");
 
-    canvasListeners.get("pointerleave")();
+    fireCanvas("pointerdown", { clientX: 400, clientY: 300, button: 2, pointerId: 5, preventDefault() {} });
+    fireCanvas("pointerup", { clientX: 400, clientY: 300 });
+    assert.equal(activeOutput.textContent, "1 tile aktif (1, 0)", "right click preserves a single selection outside multi-select mode");
+
+    fireCanvas("pointerleave");
     frames.shift()(1040);
     assert.equal(hoverOutput.textContent, "—");
     assert.equal(activeOutput.textContent, "1 tile aktif (1, 0)");
@@ -129,8 +158,8 @@ test("application startup wires resize, grid input, and render loop", async () =
 
     const fillsBeforeResizeFrame = calls.fills;
     frames.shift()(1056);
-    assert.deepEqual(calls.clears[8], [0, 0, 1024, 768]);
-    assert.equal(calls.fills - fillsBeforeResizeFrame, 11 * 11 + 1);
+    assert.deepEqual(calls.clears[9], [0, 0, 1024, 768]);
+    assert.equal(calls.fills - fillsBeforeResizeFrame, 11 * 11 + 1, "single selection remains visible in normal mode");
   } finally {
     if (originalDocument === undefined) delete globalThis.document;
     else globalThis.document = originalDocument;

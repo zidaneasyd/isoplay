@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createInspector } from "./src/js/inspector.js";
+import { createInspector } from "../src/js/inspector.js";
 
 function makeInput(value) {
   const listeners = new Map();

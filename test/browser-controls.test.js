@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { preventBrowserZoom } from "./src/js/browser-controls.js";
+import { preventBrowserZoom } from "../src/js/browser-controls.js";
 
 function createWindowStub() {
   const listeners = new Map();

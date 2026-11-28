@@ -19,12 +19,16 @@
       <label><input id="show-axes" type="checkbox" checked> <span>Sumbu</span></label>
       <label><input id="show-grid" type="checkbox" checked> <span>Grid</span></label>
     </div>
+    <div class="inspector-toggles">
+      <label><input id="multi-select" type="checkbox"> <span>Seleksi multi</span></label>
+    </div>
+    <p class="inspector-help">Scroll: zoom · Klik tengah + geser: pan</p>
   </section>
   <section class="hover-card" aria-label="Koordinat tile yang diarahkan">
     <h2>Koordinat tile</h2>
     <div class="coordinate-row"><span>Hover</span><output id="hover-coordinates" aria-live="polite">—</output></div>
     <div class="coordinate-row"><span>Tile aktif</span><output id="active-coordinates" aria-live="polite">0 tile aktif</output></div>
   </section>
-  <script type="module" src="./src/js/main.js"></script>
+  <script type="module" src="./src/js/main.js?v=camera-1"></script>
 </body>
 </html>

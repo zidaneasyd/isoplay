@@ -1,4 +1,4 @@
-export function createInspector(sizeInput, sizeValue, axesInput, gridInput) {
+export function createInspector(sizeInput, sizeValue, axesInput, gridInput, multiSelectInput) {
   let gridSize = Number(sizeInput.value);
   let showAxes = axesInput ? axesInput.checked : true;
   let showGrid = gridInput ? gridInput.checked : true;
@@ -22,5 +22,6 @@ export function createInspector(sizeInput, sizeValue, axesInput, gridInput) {
     getGridSize: () => gridSize,
     getShowAxes: () => axesInput ? axesInput.checked : showAxes,
     getShowGrid: () => gridInput ? gridInput.checked : showGrid,
+    getMultiSelect: () => multiSelectInput ? multiSelectInput.checked : false,
   };
 }
