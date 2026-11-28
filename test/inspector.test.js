@@ -35,6 +35,22 @@ test("inspector updates the grid size and output when the slider changes", () =>
   }
 });
 
+test("inspector clamps plane sizes to the supported 9 through 99 range", () => {
+  const input = createInput(100);
+  const output = {};
+  const inspector = createInspector(input, output);
+
+  assert.equal(inspector.getGridSize(), 99);
+  assert.equal(input.value, "99");
+  assert.equal(output.value, "99 \u00d7 99");
+
+  input.value = "8";
+  input.dispatch("input");
+  assert.equal(inspector.getGridSize(), 9);
+  assert.equal(input.value, "9");
+  assert.equal(output.value, "9 \u00d7 9");
+});
+
 test("inspector exposes axis and grid visibility toggles", () => {
   const input = createInput(9);
   const output = {};

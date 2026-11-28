@@ -6,52 +6,60 @@ import { createCamera } from "../src/js/camera.js";
 import { createGridTiles } from "../src/js/grid-model.js";
 
 function createContext() {
-  const calls = { fills: 0, strokes: 0, paths: [], cellPaths: [], currentPath: [] };
+  const calls = { fills: 0, strokes: 0, strokePaths: [], currentPoints: [], currentLineCount: 0 };
   const context = {
     beginPath() {
-      if (calls.currentPath.length) calls.paths.push(calls.currentPath);
-      calls.currentPath = [];
+      calls.currentPoints = [];
+      calls.currentLineCount = 0;
     },
-    moveTo(x, y) { calls.currentPath.push([x, y]); },
-    lineTo(x, y) { calls.currentPath.push([x, y]); },
-    closePath() { calls.cellPaths.push(calls.currentPath.slice(-4)); },
+    moveTo(x, y) { calls.currentPoints.push([x, y]); },
+    lineTo(x, y) {
+      calls.currentPoints.push([x, y]);
+      calls.currentLineCount += 1;
+    },
+    closePath() {},
     arc() {},
     fill() { calls.fills += 1; },
-    stroke() { calls.strokes += 1; },
+    stroke() {
+      calls.strokes += 1;
+      calls.strokePaths.push({ points: calls.currentPoints.slice(), lineCount: calls.currentLineCount });
+    },
   };
   return { calls, context };
 }
 
-test("drawGrid draws the requested cell count for multiple sizes", () => {
+test("drawGrid strokes each shared tile edge only once", () => {
   for (const size of [1, 9, 31, 63]) {
     const { calls, context } = createContext();
-    drawGrid(context, 800, 600, size);
+    const rendered = drawGrid(context, 800, 600, size);
+    const uniqueEdges = 2 * size * size + 2 * size;
+    assert.equal(rendered, size * size);
     assert.equal(calls.fills, 1, `${size}x${size} grid has no tile fills`);
-    assert.equal(calls.strokes, size * size + 4, `${size}x${size} cell edges plus axes`);
+    assert.equal(calls.strokes, 5, `${size}x${size} grid has one grid stroke plus four axis strokes`);
+    assert.equal(calls.strokePaths[0].lineCount, uniqueEdges);
   }
 });
 
-test("drawGrid centers odd sized grid on the origin cell", () => {
+test("drawGrid centers the odd-sized grid at the canvas center", () => {
   const { calls, context } = createContext();
   drawGrid(context, 800, 600, 9);
-  calls.paths.push(calls.currentPath);
-  const centers = calls.cellPaths
-    .map(([top, right]) => [right[0] - tileW / 2, top[1] + tileH / 2]);
+  const points = calls.strokePaths[0].points;
+  const centerCellCorners = [[400, 284], [432, 300], [400, 316], [368, 300]];
 
-  assert.equal(centers.length, 81);
-  assert.ok(centers.some(([x, y]) => x === 400 && y === 300));
+  assert.ok(centerCellCorners.every(([x, y]) => points.some((point) => point[0] === x && point[1] === y)));
 });
 
-test("drawGrid supports rectangular grids and places their center cell at canvas center", () => {
+test("drawGrid supports rectangular grids and draws each edge once", () => {
   const { calls, context } = createContext();
-  drawGrid(context, 800, 600, 5, 3);
-  calls.paths.push(calls.currentPath);
-  const centers = calls.cellPaths
-    .map(([top, right]) => [right[0] - tileW / 2, top[1] + tileH / 2]);
+  const rendered = drawGrid(context, 800, 600, 5, 3);
+  const points = calls.strokePaths[0].points;
+  const centerCellCorners = [[400, 284], [432, 300], [400, 316], [368, 300]];
 
+  assert.equal(rendered, 15);
   assert.equal(calls.fills, 1);
-  assert.equal(calls.strokes, 19);
-  assert.ok(centers.some(([x, y]) => x === 400 && y === 300));
+  assert.equal(calls.strokes, 5);
+  assert.equal(calls.strokePaths[0].lineCount, 38);
+  assert.ok(centerCellCorners.every(([x, y]) => points.some((point) => point[0] === x && point[1] === y)));
 });
 
 test("drawTiles paints solid diamonds from back to front by diagonal then height", () => {
@@ -94,8 +102,10 @@ test("drawTiles can use pre-sorted tiles and falls back to the default color", (
 
 test("drawGrid hides axis guides and tile grid independently", () => {
   const gridOnly = createContext();
-  drawGrid(gridOnly.context, 800, 600, 3, 3, { showAxes: false, showGrid: true });
-  assert.equal(gridOnly.calls.strokes, 3 * 3);
+  const renderedGridCells = drawGrid(gridOnly.context, 800, 600, 3, 3, { showAxes: false, showGrid: true });
+  assert.equal(renderedGridCells, 9);
+  assert.equal(gridOnly.calls.strokes, 1);
+  assert.equal(gridOnly.calls.strokePaths[0].lineCount, 24);
   assert.equal(gridOnly.calls.fills, 0);
 
   const axesOnly = createContext();
@@ -109,6 +119,22 @@ test("drawGrid hides axis guides and tile grid independently", () => {
   assert.equal(plain.calls.fills, 0);
 });
 
+test("drawGrid reports the number of unique visible edge segments", () => {
+  let lineCount = null;
+  drawGrid(createContext().context, 800, 600, 3, 3, {
+    showAxes: false,
+    onGridLines(count) { lineCount = count; },
+  });
+  assert.equal(lineCount, 24);
+
+  drawGrid(createContext().context, 800, 600, 3, 3, {
+    showAxes: false,
+    showGrid: false,
+    onGridLines(count) { lineCount = count; },
+  });
+  assert.equal(lineCount, 0);
+});
+
 test("drawGrid scales stroke width inversely to camera zoom", () => {
   const widths = [];
   const context = {
@@ -119,7 +145,7 @@ test("drawGrid scales stroke width inversely to camera zoom", () => {
 
   drawGrid(context, 800, 600, 3, 3, { strokeScale: 0.5 });
 
-  assert.equal(widths.length, 3 * 3 + 4);
+  assert.equal(widths.length, 5);
   assert.ok(widths.every((width) => width === 0.5));
 });
 

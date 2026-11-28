@@ -30,3 +30,38 @@ test("selection trims tiles outside a resized grid and reports whether it change
   assert.deepEqual(selection.getTiles(), [tile(2, -2)]);
   assert.equal(selection.retainWithinGrid(5), false);
 });
+
+test("selection values iterates selected tiles without building an array", () => {
+  const selection = createSelectionModel();
+  selection.add(tile(0, 0));
+  selection.add(tile(1, 0));
+  assert.deepEqual([...selection.values()].map(({ col, row }) => [col, row]), [[0, 0], [1, 0]]);
+});
+
+test("selection revision changes only when the selected content changes", () => {
+  const selection = createSelectionModel();
+  assert.equal(selection.getRevision(), 0);
+  assert.equal(selection.add(tile(0, 0)), true);
+  assert.equal(selection.getRevision(), 1);
+  assert.equal(selection.add(tile(0, 0)), false);
+  assert.equal(selection.getRevision(), 1);
+  assert.equal(selection.selectOnly(tile(0, 0)), false);
+  assert.equal(selection.remove(tile(4, 0)), false);
+  assert.equal(selection.clear(), true);
+  assert.equal(selection.getRevision(), 2);
+});
+
+test("selection keeps constant-time hover membership and height batch metadata", () => {
+  const selection = createSelectionModel();
+  const flat = tile(0, 0);
+  const raised = { col: 1, row: 0, height: 2 };
+  assert.equal(selection.hasUniformHeight(), true);
+  selection.add(flat);
+  assert.equal(selection.has(flat), true);
+  assert.equal(selection.has({ col: 0, row: 0, height: 1 }), false);
+  assert.equal(selection.hasUniformHeight(), true);
+  selection.add(raised);
+  assert.equal(selection.hasUniformHeight(), false);
+  selection.remove(raised);
+  assert.equal(selection.hasUniformHeight(), true);
+});

@@ -5,7 +5,9 @@ test("application startup wires resize, grid input, and render loop", async () =
   const originalDocument = globalThis.document;
   const originalWindow = globalThis.window;
   const originalRaf = globalThis.requestAnimationFrame;
+  const originalPath2D = globalThis.Path2D;
   const listeners = new Map();
+  const documentListeners = new Map();
   const frames = [];
   const calls = { transforms: [], clears: [], fills: 0, strokes: 0, fillStyles: [], strokeStyles: [] };
   const context = {
@@ -31,7 +33,10 @@ test("application startup wires resize, grid input, and render loop", async () =
   const sliderListeners = new Map();
   const slider = {
     value: "9",
-    addEventListener(name, listener) { sliderListeners.set(name, listener); },
+    addEventListener(name, listener) {
+      if (!sliderListeners.has(name)) sliderListeners.set(name, []);
+      sliderListeners.get(name).push(listener);
+    },
   };
   const output = {};
   const hoverOutput = {};
@@ -50,7 +55,10 @@ test("application startup wires resize, grid input, and render loop", async () =
   const axesToggle = makeToggle(true);
   const gridToggle = makeToggle(true);
   const multiSelectToggle = makeToggle(false);
+  const sandboxModeToggle = makeToggle(false);
   globalThis.document = {
+    hidden: false,
+    addEventListener(name, listener) { documentListeners.set(name, listener); },
     getElementById(id) {
       return ({
         canvas,
@@ -59,6 +67,7 @@ test("application startup wires resize, grid input, and render loop", async () =
         "show-axes": axesToggle,
         "show-grid": gridToggle,
         "multi-select": multiSelectToggle,
+        "sandbox-mode": sandboxModeToggle,
         "hover-coordinates": hoverOutput,
         "active-coordinates": activeOutput,
       })[id];
@@ -71,6 +80,11 @@ test("application startup wires resize, grid input, and render loop", async () =
     addEventListener(name, listener) { listeners.set(name, listener); },
   };
   globalThis.requestAnimationFrame = (callback) => { frames.push(callback); return frames.length; };
+  globalThis.Path2D = class {
+    moveTo() {}
+    lineTo() {}
+    closePath() {}
+  };
 
   try {
     await import(`../src/js/main.js?test=${Date.now()}`);
@@ -82,30 +96,45 @@ test("application startup wires resize, grid input, and render loop", async () =
     assert.equal(gridToggle.checked, true);
     assert.equal(canvas.style.cursor, "");
     assert.ok(listeners.has("resize"));
+    assert.ok(listeners.has("orientationchange"));
+    assert.ok(listeners.has("focus"));
+    assert.ok(listeners.has("pageshow"));
+    assert.ok(documentListeners.has("visibilitychange"));
+    assert.ok(canvasListeners.has("contextrestored"));
     assert.ok(listeners.has("wheel"));
     assert.ok(canvasListeners.has("wheel"), "camera controls attach canvas zoom");
     assert.equal(frames.length, 1);
 
     frames.shift()(1000);
     assert.deepEqual(calls.clears[0], [0, 0, 800, 600]);
-    assert.equal(calls.fills, 3, "base tile fills are batched, with the origin marker");
+    assert.equal(calls.fills, 2, "the cached board and origin marker each fill once");
 
     fireCanvas("pointermove", { clientX: 400, clientY: 300 });
     frames.shift()(1008);
     assert.equal(hoverOutput.textContent, "(0, 0)");
     assert.equal(calls.fillStyles.at(-1), "rgba(189, 121, 82, 0.5)");
 
+    const fillsBeforeSelection = calls.fillStyles.length;
+    fireCanvas("pointerdown", { clientX: 400, clientY: 300, button: 0, pointerId: 6 });
+    fireCanvas("pointerup", { clientX: 400, clientY: 300 });
+    frames.shift()(1012);
+    const selectionFrameFills = calls.fillStyles.slice(fillsBeforeSelection);
+    assert.equal(selectionFrameFills.includes("rgba(189, 121, 82, 0.5)"), false,
+      "a selected hover tile is drawn once with the selection outline");
+    assert.equal(selectionFrameFills.at(-1), "rgba(153, 132, 194, 0.5)");
+
     axesToggle.checked = false;
+    axesToggle.dispatch("change");
     const strokesBeforeAxesToggle = calls.strokes;
     frames.shift()(1016);
-    assert.equal(calls.strokes - strokesBeforeAxesToggle, 3, "visible tile outlines are batched while axes are hidden");
-    assert.equal(calls.strokeStyles.at(-1), "rgba(255, 184, 138, 0.5)");
+    assert.equal(calls.strokes - strokesBeforeAxesToggle, 2, "unique grid edges and the active selection outline are each stroked once");
+    assert.equal(calls.strokeStyles.at(-1), "rgba(211, 198, 255, 0.5)");
 
     gridToggle.checked = false;
     gridToggle.dispatch("change");
     const strokesBeforePlain = calls.strokes;
     frames.shift()(1024);
-    assert.equal(calls.strokes - strokesBeforePlain, 1, "only the hover outline remains on a plain plane");
+    assert.equal(calls.strokes - strokesBeforePlain, 1, "only the active selection outline remains on a plain plane");
 
     multiSelectToggle.checked = true;
     multiSelectToggle.dispatch("change");
@@ -149,7 +178,7 @@ test("application startup wires resize, grid input, and render loop", async () =
     assert.equal(activeOutput.textContent, "1 tile aktif (1, 0)");
 
     slider.value = "11";
-    sliderListeners.get("input")();
+    for (const listener of sliderListeners.get("input")) listener();
     assert.equal(output.value, "11 \u00d7 11");
     window.innerWidth = 1024;
     window.innerHeight = 768;
@@ -158,8 +187,31 @@ test("application startup wires resize, grid input, and render loop", async () =
 
     const fillsBeforeResizeFrame = calls.fills;
     frames.shift()(1056);
-    assert.deepEqual(calls.clears[9], [0, 0, 1024, 768]);
-    assert.equal(calls.fills - fillsBeforeResizeFrame, 3, "base tile fills are batched with the selected tile");
+    assert.deepEqual(calls.clears[10], [0, 0, 1024, 768]);
+    assert.equal(calls.fills - fillsBeforeResizeFrame, 2,
+      "board and selected overlay each fill once while axes are hidden");
+    assert.equal(frames.length, 0, "Dev mode returns to idle after each change-driven render");
+
+    sandboxModeToggle.checked = true;
+    sandboxModeToggle.dispatch("change");
+    assert.equal(frames.length, 1, "entering Sandbox starts the continuous loop");
+    frames.shift()(2000);
+    assert.equal(frames.length, 1, "Sandbox schedules its next frame while active");
+    frames.shift()(2016);
+    sandboxModeToggle.checked = false;
+    sandboxModeToggle.dispatch("change");
+    assert.equal(frames.length, 1, "leaving Sandbox allows one final pending frame");
+    frames.shift()(2032);
+    assert.equal(frames.length, 0, "leaving Sandbox stops continuous rendering");
+
+    listeners.get("focus")();
+    listeners.get("pageshow")();
+    listeners.get("orientationchange")();
+    documentListeners.get("visibilitychange")();
+    fireCanvas("contextrestored");
+    assert.equal(frames.length, 1, "general lifecycle triggers coalesce to one Dev render");
+    frames.shift()(2048);
+    assert.equal(frames.length, 0);
   } finally {
     if (originalDocument === undefined) delete globalThis.document;
     else globalThis.document = originalDocument;
@@ -167,5 +219,7 @@ test("application startup wires resize, grid input, and render loop", async () =
     else globalThis.window = originalWindow;
     if (originalRaf === undefined) delete globalThis.requestAnimationFrame;
     else globalThis.requestAnimationFrame = originalRaf;
+    if (originalPath2D === undefined) delete globalThis.Path2D;
+    else globalThis.Path2D = originalPath2D;
   }
 });
