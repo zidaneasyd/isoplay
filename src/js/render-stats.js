@@ -30,6 +30,7 @@ export function createRenderStats(outputs, {
     if (!latest || disposed) return;
     const idle = now() - lastFrameTime > idleGap;
     write("tiles", String(latest.tiles));
+    write("visibleTiles", String(latest.visibleTiles));
     write("gridLines", String(latest.gridLines));
     write("fps", idle || fps === null ? EMPTY_VALUE : String(fps));
     write("time", `${latest.renderMs.toFixed(2)} ms`);
@@ -42,7 +43,7 @@ export function createRenderStats(outputs, {
   }
 
   return {
-    record({ tiles, gridLines, renderMs }) {
+    record({ tiles, visibleTiles, gridLines, renderMs }) {
       if (disposed) return;
       const time = now();
       if (lastFrameTime === null || time - lastFrameTime > idleGap) {
@@ -59,7 +60,7 @@ export function createRenderStats(outputs, {
         }
       }
       lastFrameTime = time;
-      latest = { tiles, gridLines, renderMs };
+      latest = { tiles, visibleTiles, gridLines, renderMs };
       schedule();
     },
     dispose() {
