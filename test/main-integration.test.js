@@ -6,6 +6,7 @@ test("application startup wires resize, grid input, and render loop", async () =
   const originalWindow = globalThis.window;
   const originalRaf = globalThis.requestAnimationFrame;
   const listeners = new Map();
+  const documentListeners = new Map();
   const frames = [];
   const calls = { transforms: [], clears: [], fills: 0, strokes: 0, fillStyles: [], strokeStyles: [] };
   const context = {
@@ -31,7 +32,10 @@ test("application startup wires resize, grid input, and render loop", async () =
   const sliderListeners = new Map();
   const slider = {
     value: "9",
-    addEventListener(name, listener) { sliderListeners.set(name, listener); },
+    addEventListener(name, listener) {
+      if (!sliderListeners.has(name)) sliderListeners.set(name, []);
+      sliderListeners.get(name).push(listener);
+    },
   };
   const output = {};
   const hoverOutput = {};
@@ -50,7 +54,10 @@ test("application startup wires resize, grid input, and render loop", async () =
   const axesToggle = makeToggle(true);
   const gridToggle = makeToggle(true);
   const multiSelectToggle = makeToggle(false);
+  const sandboxModeToggle = makeToggle(false);
   globalThis.document = {
+    hidden: false,
+    addEventListener(name, listener) { documentListeners.set(name, listener); },
     getElementById(id) {
       return ({
         canvas,
@@ -59,6 +66,7 @@ test("application startup wires resize, grid input, and render loop", async () =
         "show-axes": axesToggle,
         "show-grid": gridToggle,
         "multi-select": multiSelectToggle,
+        "sandbox-mode": sandboxModeToggle,
         "hover-coordinates": hoverOutput,
         "active-coordinates": activeOutput,
       })[id];
@@ -82,6 +90,11 @@ test("application startup wires resize, grid input, and render loop", async () =
     assert.equal(gridToggle.checked, true);
     assert.equal(canvas.style.cursor, "");
     assert.ok(listeners.has("resize"));
+    assert.ok(listeners.has("orientationchange"));
+    assert.ok(listeners.has("focus"));
+    assert.ok(listeners.has("pageshow"));
+    assert.ok(documentListeners.has("visibilitychange"));
+    assert.ok(canvasListeners.has("contextrestored"));
     assert.ok(listeners.has("wheel"));
     assert.ok(canvasListeners.has("wheel"), "camera controls attach canvas zoom");
     assert.equal(frames.length, 1);
@@ -96,6 +109,7 @@ test("application startup wires resize, grid input, and render loop", async () =
     assert.equal(calls.fillStyles.at(-1), "rgba(189, 121, 82, 0.5)");
 
     axesToggle.checked = false;
+    axesToggle.dispatch("change");
     const strokesBeforeAxesToggle = calls.strokes;
     frames.shift()(1016);
     assert.equal(calls.strokes - strokesBeforeAxesToggle, 3, "visible tile outlines are batched while axes are hidden");
@@ -149,7 +163,7 @@ test("application startup wires resize, grid input, and render loop", async () =
     assert.equal(activeOutput.textContent, "1 tile aktif (1, 0)");
 
     slider.value = "11";
-    sliderListeners.get("input")();
+    for (const listener of sliderListeners.get("input")) listener();
     assert.equal(output.value, "11 \u00d7 11");
     window.innerWidth = 1024;
     window.innerHeight = 768;
@@ -160,6 +174,28 @@ test("application startup wires resize, grid input, and render loop", async () =
     frames.shift()(1056);
     assert.deepEqual(calls.clears[9], [0, 0, 1024, 768]);
     assert.equal(calls.fills - fillsBeforeResizeFrame, 3, "base tile fills are batched with the selected tile");
+    assert.equal(frames.length, 0, "Dev mode returns to idle after each change-driven render");
+
+    sandboxModeToggle.checked = true;
+    sandboxModeToggle.dispatch("change");
+    assert.equal(frames.length, 1, "entering Sandbox starts the continuous loop");
+    frames.shift()(2000);
+    assert.equal(frames.length, 1, "Sandbox schedules its next frame while active");
+    frames.shift()(2016);
+    sandboxModeToggle.checked = false;
+    sandboxModeToggle.dispatch("change");
+    assert.equal(frames.length, 1, "leaving Sandbox allows one final pending frame");
+    frames.shift()(2032);
+    assert.equal(frames.length, 0, "leaving Sandbox stops continuous rendering");
+
+    listeners.get("focus")();
+    listeners.get("pageshow")();
+    listeners.get("orientationchange")();
+    documentListeners.get("visibilitychange")();
+    fireCanvas("contextrestored");
+    assert.equal(frames.length, 1, "general lifecycle triggers coalesce to one Dev render");
+    frames.shift()(2048);
+    assert.equal(frames.length, 0);
   } finally {
     if (originalDocument === undefined) delete globalThis.document;
     else globalThis.document = originalDocument;

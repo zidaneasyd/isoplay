@@ -1,6 +1,6 @@
 import { createCanvas } from "./canvas.js";
 import { attachCameraControls, createCamera } from "./camera.js?v=camera-1";
-import { startRenderLoop } from "./animation.js";
+import { createRenderScheduler } from "./animation.js";
 import { preventBrowserZoom } from "./browser-controls.js";
 import { drawGrid, drawTile, drawTiles, getVisibleTileBounds, isTileInBounds } from "./renderer.js";
 import { gridToScreen, tileH } from "./isometric.js";
@@ -9,18 +9,17 @@ import { createGridTiles } from "./grid-model.js";
 import { createSelectionModel } from "./selection-model.js";
 import { attachTileInteraction } from "./tile-interaction.js?v=camera-1";
 import { createTileInfoPanel } from "./tile-info-panel.js";
+import { createSandbox } from "./sandbox.js";
 
 const canvas = document.getElementById("canvas");
 const { context, getSize, resize } = createCanvas(canvas);
 const sizeInput = document.getElementById("grid-size");
 const sizeValue = document.getElementById("grid-size-value");
-const inspector = createInspector(
-  sizeInput,
-  sizeValue,
-  document.getElementById("show-axes"),
-  document.getElementById("show-grid"),
-  document.getElementById("multi-select")
-);
+const axesInput = document.getElementById("show-axes");
+const gridInput = document.getElementById("show-grid");
+const multiSelectInput = document.getElementById("multi-select");
+const sandboxModeInput = document.getElementById("sandbox-mode");
+const inspector = createInspector(sizeInput, sizeValue, axesInput, gridInput, multiSelectInput);
 const selection = createSelectionModel();
 const panel = createTileInfoPanel(
   document.getElementById("hover-coordinates"),
@@ -33,14 +32,22 @@ const renderStats = {
   time: document.getElementById("render-time"),
 };
 const camera = createCamera();
+const sandbox = createSandbox();
+let requestRender = () => {};
 const interaction = attachTileInteraction(canvas, {
   getCanvasSize: getSize,
   getGridSize: inspector.getGridSize,
   camera,
   getMultiSelect: inspector.getMultiSelect,
   selection,
-  onHover: panel.showHover,
-  onSelectionChange: panel.showActive,
+  onHover(tile) {
+    panel.showHover(tile);
+    requestRender();
+  },
+  onSelectionChange(tiles) {
+    panel.showActive(tiles);
+    requestRender();
+  },
 });
 
 function updateSelectionMode() {
@@ -49,33 +56,29 @@ function updateSelectionMode() {
     selection.clear();
     panel.showActive(selection.getTiles());
   }
+  requestRender();
 }
 
-document.getElementById("multi-select")?.addEventListener("change", updateSelectionMode);
+multiSelectInput?.addEventListener("change", updateSelectionMode);
 canvas.style.cursor = inspector.getMultiSelect() ? "crosshair" : "";
 
 attachCameraControls(canvas, {
   camera,
   getCanvasSize: getSize,
-  onChange: interaction.refreshHover,
+  onChange() {
+    interaction.refreshHover();
+    requestRender();
+  },
   getDefaultCursor: () => inspector.getMultiSelect() ? "crosshair" : "",
 });
-
-function resizeCanvas() {
-  resize();
-  interaction.refreshHover();
-}
-
-preventBrowserZoom();
-window.addEventListener("resize", resizeCanvas);
-resizeCanvas();
 
 let cachedGridSize = null;
 let gridTiles = [];
 let fpsElapsed = 0;
 let fpsFrames = 0;
 let measuredFps = null;
-startRenderLoop((dt) => {
+function renderFrame(dt) {
+  if (sandbox.isActive()) sandbox.update(dt);
   const renderStartedAt = performance.now();
   const { width, height } = getSize();
   const gridSize = inspector.getGridSize();
@@ -144,14 +147,44 @@ startRenderLoop((dt) => {
       fpsFrames = 0;
     }
   }
-  if (renderStats.tiles) {
-    renderStats.tiles.textContent = String(renderedTiles);
-  }
-  if (renderStats.gridCells) {
-    renderStats.gridCells.textContent = String(renderedGridCells);
-  }
-  if (renderStats.fps) {
-    renderStats.fps.textContent = measuredFps === null ? "—" : String(measuredFps);
-  }
+  if (renderStats.tiles) renderStats.tiles.textContent = String(renderedTiles);
+  if (renderStats.gridCells) renderStats.gridCells.textContent = String(renderedGridCells);
+  if (renderStats.fps) renderStats.fps.textContent = measuredFps === null ? "—" : String(measuredFps);
   if (renderStats.time) renderStats.time.textContent = `${renderDuration.toFixed(2)} ms`;
+}
+
+const scheduler = createRenderScheduler(renderFrame);
+requestRender = scheduler.invalidate;
+function updateExecutionMode() {
+  if (sandboxModeInput?.checked) {
+    sandbox.start();
+    scheduler.setContinuous(true);
+  } else {
+    sandbox.stop();
+    scheduler.setContinuous(false);
+    requestRender();
+  }
+}
+
+sandboxModeInput?.addEventListener("change", updateExecutionMode);
+sizeInput.addEventListener("input", requestRender);
+sizeInput.addEventListener("change", requestRender);
+axesInput?.addEventListener("change", requestRender);
+gridInput?.addEventListener("change", requestRender);
+
+function resizeCanvas() {
+  resize();
+  interaction.refreshHover();
+  requestRender();
+}
+
+preventBrowserZoom();
+window.addEventListener("resize", resizeCanvas);
+window.addEventListener("orientationchange", resizeCanvas);
+window.addEventListener("focus", requestRender);
+window.addEventListener("pageshow", requestRender);
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) requestRender();
 });
+canvas.addEventListener("contextrestored", requestRender);
+resizeCanvas();
